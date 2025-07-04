@@ -1,0 +1,64 @@
+testdata
+trash
+*.mska
+*.msk
+*.nii
+*.nii.gz
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+pytest_cache/
+
+# MyPy / Pyright / Pyre type checker
+.mypy_cache/
+.pyre/
+.pytype/
+
+# VS Code
+.vscode/
+
+# IDEs
+.idea/
+
+# Environments
+.env
+.venv
+venv/
+ENV/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Mac / Linux
+.DS_Store
+*.swp
+
+# Logs
+*.log
+
+# uv local cache
+.uv/ 
