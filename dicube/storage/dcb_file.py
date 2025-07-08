@@ -487,7 +487,8 @@ class DcbFile:
 
 class DcbSFile(DcbFile):
     """
-    DICOM cube file implementation for OJPH compression.
+    DICOM cube file implementation for Speed need.
+    (losless, average compression ratio, speed sensitive)
     """
 
     MAGIC = b"DCMCUBES"
@@ -518,3 +519,28 @@ class DcbSFile(DcbFile):
         """
         jph_codec = get_codec('jph')
         return jph_codec.decode(bytes) 
+    
+
+class DcbAFile(DcbFile):
+    """
+    DICOM cube file implementation for Archiving need.
+    (loseless, high compression ratio, speed insensitive)
+    """
+
+    MAGIC = b"DCMCUBEA"
+    VERSION = 1
+
+    NotImplementedError("DcbAFile is not implemented yet, no suitable codec")
+
+
+
+class DcbLFile(DcbFile):
+    """
+    DICOM cube file implementation for Lossy need.
+    (lossy, very high compression ratio, speed insensitive)
+    """
+
+    MAGIC = b"DCMCUBEL"
+    VERSION = 1
+
+    NotImplementedError("DcbLFile is not implemented yet, no suitable codec")

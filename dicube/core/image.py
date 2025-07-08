@@ -14,7 +14,7 @@ from ..dicom import (
     read_dicom_dir,
 )
 from ..dicom.dicom_io import save_to_dicom_folder
-from ..storage.dcb_file import DcbSFile, DcbFile
+from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
 from .pixel_header import PixelDataHeader
 from ..storage.pixel_utils import derive_pixel_header_from_array, get_float_data
 from ..dicom import get_space_from_DicomMeta
@@ -227,15 +227,24 @@ class DicomCubeImage:
                     f"Space shape {expected_shape} mismatch with image {self.raw_image.shape}"
                 )
 
-    def to_file(self, filename: str, num_threads: int = 4):
+    def to_file(self, filename: str, num_threads: int = 4, file_type: str = "s"):
         """
         Write the current object to a file using JPEG XL compression.
 
         Args:
             filename: Path to the output file
             num_threads: Number of workers for parallel encoding
+            file_type: File type, one of "s", "a", "l"
         """
-        writer = DcbAFile(filename, mode="w")
+        if file_type == "s":
+            writer = DcbSFile(filename, mode="w")
+        elif file_type == "a":
+            writer = DcbAFile(filename, mode="w")
+        elif file_type == "l":
+            writer = DcbLFile(filename, mode="w")
+        else:
+            raise ValueError(f"Unsupported file type: {file_type}, must be one of 's', 'a', 'l'")
+        
         writer.write(
             dicom_meta=self.dicom_meta,
             space=self.space,
@@ -244,22 +253,6 @@ class DicomCubeImage:
             num_threads=num_threads,
         )
 
-    def to_file_speed(self, filename: str, num_threads: int = 4):
-        """
-        将当前对象编码为HTJ2K格式文件。
-
-        Args:
-            filename: 输出文件路径
-            num_threads: 并行编码的线程数
-        """
-        writer = DcbSFile(filename, mode="w")
-        writer.write(
-            dicom_meta=self.dicom_meta,
-            space=self.space,
-            pixel_header=self.pixel_header,
-            images=self.raw_image,
-            num_threads=num_threads,
-        )
 
     def to_dicom_folder(
         self,
