@@ -1,7 +1,6 @@
-from .dcb_file import DcbAFile, DcbFile, DcbSFile
+from .dcb_file import DcbFile, DcbSFile
 
 __all__ = [
     "DcbFile",
-    "DcbAFile",
     "DcbSFile",
 ] 

@@ -4,7 +4,6 @@ import tempfile
 import numpy as np
 import pytest
 
-from dicube.storage.dcb_file import DcbAFile
 from dicube.core.image import DicomCubeImage
 from dicube.core.pixel_header import PixelDataHeader
 
@@ -62,14 +61,14 @@ def test_dicom_cube_image_basic_operations():
 
 
 @pytest.mark.skipif(
-    not os.path.exists("example/data/dicom/sample_150"),
+    not os.path.exists("testdata/dicom/sample_150"),
     reason="Sample DICOM data not available"
 )
 def test_dicom_cube_image_from_dicom_folder():
     """
     测试从DICOM文件夹创建图像
     """
-    folder_path = "example/data/dicom/sample_150"
+    folder_path = "testdata/dicom/sample_150"
     
     image = DicomCubeImage.from_dicom_folder(folder_path)
     assert image.raw_image.ndim == 3

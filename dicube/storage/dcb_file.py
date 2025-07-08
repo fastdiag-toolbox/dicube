@@ -92,9 +92,7 @@ class DcbFile:
         version = hdr["version"]
 
         if magic != self.MAGIC:
-            if magic == DcbAFile.MAGIC and version == DcbAFile.VERSION:
-                self.__class__ = DcbAFile
-            elif magic == DcbSFile.MAGIC and version == DcbSFile.VERSION:
+            if magic == DcbSFile.MAGIC and version == DcbSFile.VERSION:
                 self.__class__ = DcbSFile
             else:
                 raise ValueError(f"不支持的文件格式, 魔数: {magic}")
@@ -484,40 +482,7 @@ class DcbFile:
         return raw_bin.decode("utf-8")
 
 
-class DcbAFile(DcbFile):
-    """
-    Standard DICOM cube file implementation for single-channel images.
-    Uses JPEG XL compression for image data.
-    """
 
-    MAGIC = b"DCMCUBEA"
-    VERSION = 1
-
-    def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
-        """
-        Encode a single frame using JPEG XL compression.
-
-        Args:
-            frame_data: Input image array
-
-        Returns:
-            bytes: JPEG XL encoded image data
-        """
-        jxl_codec = get_codec('jxl')
-        return jxl_codec.encode(frame_data, quality=101, effort=3)
-
-    def _decode_one_frame(self, bytes) -> np.ndarray:
-        """
-        Decode a single JPEG XL compressed frame.
-
-        Args:
-            bytes: JPEG XL encoded image data
-
-        Returns:
-            np.ndarray: Decoded image array
-        """
-        jxl_codec = get_codec('jxl')
-        return jxl_codec.decode(bytes)
 
 
 class DcbSFile(DcbFile):

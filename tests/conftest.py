@@ -59,7 +59,7 @@ def sample_dicom_dir():
     """
     Sample DICOM directory fixture
     """
-    dicom_dir = "example/data/dicom/sample_150"
+    dicom_dir = "testdata/dicom/sample_150"
     if os.path.exists(dicom_dir):
         return dicom_dir
     else:

@@ -129,12 +129,6 @@ def is_codec_available(name: str) -> bool:
 
 # Import and register concrete implementations
 try:
-    from .jxl.codec import JxlCodec
-    register_codec(JxlCodec())
-except ImportError:
-    pass  # JXL codec not available
-
-try:
     from .jph.codec import JphCodec  
     register_codec(JphCodec())
 except ImportError:

@@ -14,7 +14,7 @@ from ..dicom import (
     read_dicom_dir,
 )
 from ..dicom.dicom_io import save_to_dicom_folder
-from ..storage.dcb_file import DcbAFile, DcbSFile, DcbFile
+from ..storage.dcb_file import DcbSFile, DcbFile
 from .pixel_header import PixelDataHeader
 from ..storage.pixel_utils import derive_pixel_header_from_array, get_float_data
 from ..dicom import get_space_from_DicomMeta
