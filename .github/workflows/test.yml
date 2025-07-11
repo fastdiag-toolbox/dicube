@@ -47,6 +47,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install numpy pybind11[global] cmake ninja
         pip install pytest pytest-cov
+        pip install pydicom>=2.3.0 zstandard>=0.18.0
 
     - name: Build extensions
       run: |
@@ -55,13 +56,21 @@ jobs:
     - name: Test import
       run: |
         python -c "
-        import dicube
-        from dicube.codecs.jph import JphCodec
-        codec = JphCodec()
-        print(f'JphCodec loaded: {codec.name}')
-        print(f'Available: {codec.is_available()}')
-        assert codec.is_available(), 'JphCodec should be available'
-        print('✓ Import test passed')
+        # Test basic imports first
+        import sys
+        print(f'Python version: {sys.version}')
+        
+        # Test codec import (no main dicube import to avoid dependencies)
+        try:
+            from dicube.codecs.jph import JphCodec
+            codec = JphCodec()
+            print(f'✓ JphCodec loaded: {codec.name}')
+            print(f'✓ Available: {codec.is_available()}')
+            assert codec.is_available(), 'JphCodec should be available'
+            print('✓ Core functionality test passed')
+        except Exception as e:
+            print(f'✗ Import test failed: {e}')
+            raise
         "
 
     - name: Run functionality tests

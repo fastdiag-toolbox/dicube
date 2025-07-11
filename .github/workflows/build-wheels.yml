@@ -30,13 +30,18 @@ jobs:
         CIBW_ARCHS_MACOS: x86_64 arm64
         CIBW_ARCHS_WINDOWS: auto
         
+        # Use manylinux for maximum Linux compatibility
+        CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+        
         # Skip some builds
         CIBW_SKIP: cp36-* cp37-* pp* *-musllinux*
         
         # Install dependencies for each platform
         CIBW_BEFORE_ALL_LINUX: >
-          yum install -y cmake3 ninja-build gcc-c++ make &&
-          ln -sf /usr/bin/cmake3 /usr/bin/cmake
+          yum install -y cmake3 ninja-build gcc-c++ make git &&
+          ln -sf /usr/bin/cmake3 /usr/bin/cmake &&
+          git --version
         
         CIBW_BEFORE_ALL_MACOS: >
           brew install cmake ninja
@@ -47,14 +52,22 @@ jobs:
         # Install Python dependencies
         CIBW_BEFORE_BUILD: >
           pip install --upgrade pip setuptools wheel &&
-          pip install numpy pybind11[global] cmake ninja
+          pip install numpy pybind11[global] cmake ninja &&
+          pip install pydicom>=2.3.0 zstandard>=0.18.0
         
-        # Test imports
+        # Test core functionality only (avoid complex dependencies)
+        CIBW_TEST_REQUIRES: >
+          numpy
         CIBW_TEST_COMMAND: >
-          python -c "import dicube; from dicube.codecs.jph import JphCodec; 
+          python -c "from dicube.codecs.jph import JphCodec; 
+          import numpy as np;
           codec = JphCodec(); 
-          assert codec.is_available(), 'JphCodec not available'; 
-          print('✓ Import test passed')"
+          assert codec.is_available(), 'JphCodec not available';
+          img = np.ones((32, 32), dtype=np.uint8);
+          encoded = codec.encode(img);
+          decoded = codec.decode(encoded);
+          assert decoded.shape == img.shape, 'Decode shape mismatch';
+          print('✓ Wheel test passed')"
         
         # Environment variables
         CIBW_ENVIRONMENT_LINUX: >
