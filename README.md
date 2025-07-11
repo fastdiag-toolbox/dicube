@@ -8,6 +8,23 @@ DiCube was extracted from the larger DICOMCube project to focus specifically on 
 - **spacetransformer**: For 3D spatial transformations and coordinate systems
 - **medmask**: For medical image segmentation mask processing
 
+## Why DiCube?
+
+Although the DICOM standard is indispensable for clinical interoperability, it was never designed for today’s high-volume, AI-driven workflows.  In practice it exposes four chronic pain-points:
+
+1. **Fragmented storage → slow I/O** A single CT/MR study can contain hundreds of small `.dcm` files.  Traversing the file system and parsing each header one-by-one wastes precious milliseconds that quickly add up when training deep-learning models/ building realtime application.
+2. **Redundant metadata** Every slice repeats identical patient/study/series tags, inflating storage size and network traffic with no benefit.
+3. **Too many transfer syntaxes** Vendors ship proprietary or rarely-used encodings; no open-source decoder reliably supports *all* of them, so pipelines break on edge-cases.
+
+DiCube mitigates these issues by:
+
+* **Single-file design** All slices, metadata and spatial information are consolidated into one `.dcbs` file, eliminating filesystem overhead.
+* **Deduplicated metadata** A compact JSON schema separates *shared* and *per-slice* tags, then compresses them with Zstandard.
+* **Conservative codec policy** Only codecs that pass extensive performance and stability tests are adopted. Currently `.dcbs` uses HTJ2K for fast, lossless compression. Archive (`.dcba`) and lossy (`.dcbl`) variants are planned but not yet released. This package is a self-contained lib, users do not need to install codecs independently.
+* **Round-trip safety** Every DiCube file can always be converted back to standard DICOM, preserving full clinical fidelity.
+
+> In typical benchmarks DiCube cuts CT series load time from ~150 ms (PyDICOM) to <40 ms and shrinks storage by up to **3×**, all while remaining 100 % DICOM-compatible.
+
 ## Architecture
 
 ### Core Modules
@@ -98,7 +115,7 @@ meta = read_dicom_dir('dicom_folder/')
 patient_name = meta.get('PatientName')  # Returns single value
 
 # Access non-shared values (different per slice)
-positions = meta.get('ImagePositionPatient', force_nonshared=True)  # Returns list
+positions = meta.get('ImagePositionPatient')  # Returns list
 
 # Check status
 from dicube import get_dicom_status
@@ -112,18 +129,18 @@ status = get_dicom_status(meta)
 DiCube uses `spacetransformer.Space` for 3D coordinate system handling:
 
 ```python
-from spacetransformer import Space
+from spacetransformer import Space, warp_image
 
 # DicomCubeImage automatically creates Space from DICOM
 image = dicube.load_from_dicom_folder('dicom/')
 space = image.space  # spacetransformer.Space object
 
 # Apply spatial transformations
-transformed_space = space.apply_flip(axis=2)
-transformed_space = space.apply_rotate(axis=0, angle=90, unit='degree')
+space2 = space.apply_flip(axis=2)
+space2 = space2.apply_rotate(axis=0, angle=90, unit='degree')
 
 # Update image with new space
-image.space = transformed_space
+image2 = warp_image(image, space, space2)
 ```
 
 ## DICOM Status Checking
