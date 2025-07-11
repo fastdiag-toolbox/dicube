@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15.0)
 
 project(dicube-openjph 
-    VERSION 1.0.0
+    VERSION 0.1.0
     DESCRIPTION "DiCube with statically linked OpenJPH"
     LANGUAGES CXX
 )
@@ -101,6 +101,7 @@ set(OPENJPH_INCLUDE_DIRS
     "${OPENJPH_SOURCE_DIR}/src/core/codestream"
     "${OPENJPH_SOURCE_DIR}/src/core/coding"
     "${OPENJPH_SOURCE_DIR}/src/core/transform"
+    "${OPENJPH_SOURCE_DIR}/src/core/others"
     "${CMAKE_BINARY_DIR}/openjph/src/core/common"  # 生成的配置文件
 )
 

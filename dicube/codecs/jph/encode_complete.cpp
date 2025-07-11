@@ -7,10 +7,10 @@
 #include <stdexcept>
 #include <cstdint>
 
-#include <openjph/ojph_file.h>
-#include <openjph/ojph_codestream.h>
-#include <openjph/ojph_mem.h>
-#include <openjph/ojph_params.h>
+#include "ojph_file.h"
+#include "ojph_codestream.h"
+#include "ojph_mem.h"
+#include "ojph_params.h"
 
 namespace py = pybind11;
 using namespace ojph;

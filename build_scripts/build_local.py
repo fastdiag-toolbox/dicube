@@ -94,7 +94,7 @@ def build_project(build_type="Release", clean=False, parallel_jobs=None):
         str(project_root),
         f"-DCMAKE_BUILD_TYPE={build_type}",
         "-DOPENJPH_BUILD_STATIC=ON",
-        "-DICUBE_BUILD_PYTHON_EXTENSIONS=ON",
+        "-DDICUBE_BUILD_PYTHON_EXTENSIONS=ON",
     ]
     
     # Check for Ninja
