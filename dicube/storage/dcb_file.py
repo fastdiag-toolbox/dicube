@@ -198,7 +198,9 @@ class DcbFile:
 
         # (3) 处理 space
         if space:
-            space_json = space.to_json().encode("utf-8")
+            # 转换 space 从内部 (z,y,x) 到文件 (x,y,z) 格式
+            space_xyz = space.reverse_axis_order()
+            space_json = space_xyz.to_json().encode("utf-8")
         else:
             space_json = b""
 
@@ -351,8 +353,9 @@ class DcbFile:
         space_json = space_json_bin.decode("utf-8")
 
         if SpaceClass is not None:
-            # 假设 SpaceClass(**dict) 可以构造
-            return SpaceClass.from_json(space_json)
+            # 从文件读取的是 (x,y,z) 格式，需要转换为内部 (z,y,x) 格式
+            space_xyz = SpaceClass.from_json(space_json)
+            return space_xyz.reverse_axis_order()
         else:
             return json.loads(space_json)
 

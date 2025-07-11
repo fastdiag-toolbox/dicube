@@ -1,30 +1,16 @@
 # core/image.py
-import struct
 import warnings
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 
 from ..dicom import (
     CommonTags,
     DicomMeta,
-    DicomStatus,
-    SortMethod,
-    get_dicom_status,
-    read_dicom_dir,
 )
-from ..dicom.dicom_io import save_to_dicom_folder
-from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
 from .pixel_header import PixelDataHeader
-from ..storage.pixel_utils import derive_pixel_header_from_array, get_float_data
-from ..dicom import get_space_from_DicomMeta
-try:
-    from spacetransformer import Space, get_space_from_nifty_affine
-except ImportError:
-    warnings.warn("spacetransformer not found, spatial functionality will be limited")
-    Space = None
-    get_space_from_DicomMeta = None
-    get_space_from_nifty_affine = None
+from ..storage.pixel_utils import get_float_data
+from spacetransformer import Space
 
 
 class DicomCubeImage:
@@ -57,22 +43,6 @@ class DicomCubeImage:
         self.space = space
         self._validate_shape()
 
-    @property
-    def shape(self):
-        """
-        Get the shape of the image.
-        """
-        return self.raw_image.shape
-
-    @property
-    def space_zyx(self):
-        """
-        Get the shape of the image in zyx order.
-        """
-        if self.space:
-            return self.space.reverse_axis_order()
-        else:
-            return None
 
     def init_meta(
         self,
@@ -213,237 +183,30 @@ class DicomCubeImage:
 
         self.dicom_meta = meta
 
+    @property
+    def shape(self):
+        return self.raw_image.shape
+    
+    @property
+    def dtype(self):
+        return self.raw_image.dtype
+    
     def _validate_shape(self):
         """
         Validate that the image shape matches the space shape if both are present.
+        Both raw_image and space are now in (z,y,x) format internally.
 
         Raises:
             ValueError: If space shape doesn't match image dimensions
         """
         if self.space and self.raw_image.ndim >= 3:
-            expected_shape = tuple(self.space.shape[::-1])
+            expected_shape = tuple(self.space.shape)
             if self.raw_image.shape[-len(expected_shape) :] != expected_shape:
                 raise ValueError(
                     f"Space shape {expected_shape} mismatch with image {self.raw_image.shape}"
                 )
 
-    def to_file(self, filename: str, num_threads: int = 4, file_type: str = "s"):
-        """
-        Write the current object to a file using JPEG XL compression.
 
-        Args:
-            filename: Path to the output file
-            num_threads: Number of workers for parallel encoding
-            file_type: File type, one of "s", "a", "l"
-        """
-        if file_type == "s":
-            writer = DcbSFile(filename, mode="w")
-        elif file_type == "a":
-            writer = DcbAFile(filename, mode="w")
-        elif file_type == "l":
-            writer = DcbLFile(filename, mode="w")
-        else:
-            raise ValueError(f"Unsupported file type: {file_type}, must be one of 's', 'a', 'l'")
-        
-        writer.write(
-            dicom_meta=self.dicom_meta,
-            space=self.space,
-            pixel_header=self.pixel_header,
-            images=self.raw_image,
-            num_threads=num_threads,
-        )
-
-
-    def to_dicom_folder(
-        self,
-        output_dir: str,
-        filenames: Optional[List[str]] = None,
-        use_j2k: bool = False,
-        lossless: bool = True,
-        **compress_kwargs,
-    ):
-        """
-        Save DicomCubeImage as a DICOM directory.
-
-        Only supports cases with dicom_meta. Will override the original DICOM's
-        slope/intercept values with those from DicomCubeImage.
-
-        Args:
-            output_dir: Output directory path
-            filenames: Optional list of filenames for each slice
-            use_j2k: Whether to use JPEG 2000 compression
-            lossless: Whether to use lossless compression when use_j2k is True
-            **compress_kwargs: Additional keyword arguments passed to ds.compress()
-                For example:
-                - encoding_plugin: The plugin to use for compression ('pylibjpeg', 'gdcm', etc)
-                - compression_level: Compression level for lossy compression
-                - photometric_interpretation: Color space for compression
-
-        Raises:
-            ValueError: If dicom_meta is not present
-        """
-        if self.dicom_meta is None:
-            warnings.warn("dicom_meta is None, initializing with default values")
-            self.init_meta()
-
-        save_to_dicom_folder(
-            raw_images=self.raw_image,
-            dicom_meta=self.dicom_meta,
-            pixel_header=self.pixel_header,
-            output_dir=output_dir,
-            filenames=filenames,
-            use_j2k=use_j2k,
-            lossless=lossless,
-            **compress_kwargs,
-        )
-
-    @classmethod
-    def from_dicom_folder(
-        cls, folder_path: str, sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC
-    ):
-        """
-        Create a DicomCubeImage instance from a DICOM directory.
-
-        Args:
-            folder_path: Path to the DICOM directory
-            sort_method: Method to sort DICOM files, defaults to instance number ascending
-
-        Returns:
-            DicomCubeImage: A new instance created from the DICOM files
-
-        Raises:
-            ValueError: If DICOM status is not supported
-        """
-        # 实现读取DICOM文件夹的逻辑
-        meta, datasets = read_dicom_dir(folder_path, sort_method=sort_method)
-        images = [d.pixel_array for d in datasets]
-        status = get_dicom_status(meta)
-        if status in (
-            DicomStatus.NON_UNIFORM_RESCALE_FACTOR,
-            DicomStatus.MISSING_DTYPE,
-            DicomStatus.NON_UNIFORM_DTYPE,
-            DicomStatus.MISSING_SHAPE,
-            DicomStatus.INCONSISTENT,
-        ):
-            raise ValueError("DicomStatus not supported: %s" % status)
-        if status in (
-            DicomStatus.MISSING_SPACING,
-            DicomStatus.NON_UNIFORM_SPACING,
-            DicomStatus.MISSING_ORIENTATION,
-            DicomStatus.NON_UNIFORM_ORIENTATION,
-            DicomStatus.MISSING_LOCATION,
-            DicomStatus.REVERSED_LOCATION,
-            DicomStatus.DWELLING_LOCATION,
-            DicomStatus.GAP_LOCATION,
-        ):
-            warnings.warn("DicomStatus: %s, cannot compute space" % status)
-            space = None
-        else:
-            if get_space_from_DicomMeta is not None:
-                space = get_space_from_DicomMeta(meta)
-            else:
-                space = None
-
-        # 获取rescale参数
-        slope = meta.get(CommonTags.RESCALE_SLOPE, force_shared=True)[0]
-        intercept = meta.get(CommonTags.RESCALE_INTERCEPT, force_shared=True)[0]
-        wind_center = meta.get(CommonTags.WINDOW_CENTER, force_shared=True)
-        wind_width = meta.get(CommonTags.WINDOW_WIDTH, force_shared=True)
-
-        # 创建pixel_header
-        pixel_header = PixelDataHeader(
-            RESCALE_SLOPE=float(slope) if slope is not None else 1.0,
-            RESCALE_INTERCEPT=float(intercept) if intercept is not None else 0.0,
-            ORIGINAL_PIXEL_DTYPE=str(images[0].dtype),
-            PIXEL_DTYPE=str(images[0].dtype),
-            WINDOW_CENTER=float(wind_center[0]) if wind_center is not None else None,
-            WINDOW_WIDTH=float(wind_width[0]) if wind_width is not None else None,
-        )
-
-        image = DicomCubeImage(np.array(images), pixel_header, meta, space)
-        return image
-
-    @classmethod
-    def from_nifti(cls, nii_path: str):
-        """
-        Create a DicomCubeImage instance from a NIfTI file.
-
-        Args:
-            nii_path: Path to the NIfTI file
-
-        Returns:
-            DicomCubeImage: A new instance created from the NIfTI file
-        """
-        try:
-            import nibabel as nib
-        except ImportError:
-            raise ImportError("nibabel is required to read NIfTI files")
-
-        if get_space_from_nifty_affine is None:
-            raise ImportError("spacetransformer is required for NIfTI spatial support")
-
-        nii = nib.load(nii_path)
-        space = get_space_from_nifty_affine(nii.affine, nii.shape[::-1])
-        # Fix numpy array warning
-        raw_image, header = derive_pixel_header_from_array(
-            np.asarray(nii.dataobj, dtype=nii.dataobj.dtype)
-        )
-        image = DicomCubeImage(raw_image, header, space=space)
-        return image
-
-    @classmethod
-    def from_file(cls, filename: str, num_threads: int = 4):
-        """
-        Automatically select the appropriate reader class based
-        on the file magic number to create a DicomCubeImage instance.
-
-        Args:
-            filename: Input file path
-            num_threads: Number of workers for parallel decoding, default is 4
-
-        Returns:
-            DicomCubeImage: A new instance created from the file
-
-        Raises:
-            ValueError: When the file format is not supported
-        """
-        # 读取文件头部来判断魔数
-        header_size = struct.calcsize(DcbFile.HEADER_STRUCT)
-        with open(filename, "rb") as f:
-            header_data = f.read(header_size)
-        magic = struct.unpack(DcbFile.HEADER_STRUCT, header_data)[0]
-
-        # 根据魔数选择合适的reader类
-        if magic == DcbAFile.MAGIC:
-            reader = DcbAFile(filename, mode="r")
-        elif magic == DcbSFile.MAGIC:
-            reader = DcbSFile(filename, mode="r")
-        else:
-            raise ValueError(f"不支持的文件格式,魔数: {magic}")
-
-        # 读取文件内容
-        dicom_meta = reader.read_meta()
-        space = reader.read_space()
-        pixel_header = reader.read_pixel_header()
-
-        images = reader.read_images(num_threads=num_threads)
-        if isinstance(images, list):
-            if len(images) == 0:
-                raw_image = np.array(
-                    [], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE
-                )  # empty
-            else:
-                raw_image = np.stack(images, axis=0)
-        else:
-            # Input is a (num_frames, H, W, ...) ndarray
-            raw_image = images
-
-        return cls(
-            raw_image=raw_image,
-            pixel_header=pixel_header,
-            dicom_meta=dicom_meta,
-            space=space,
-        )
 
     def get_fdata(self, dtype="float32") -> np.ndarray:
         """

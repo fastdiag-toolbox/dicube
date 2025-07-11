@@ -16,6 +16,7 @@ DiCube was extracted from the larger DICOMCube project to focus specifically on 
 dicube/
 ├── core/                 # Core data structures
 │   ├── image.py         # DicomCubeImage (main interface)
+|   ├── io.py            # DicomCubeImageIO (from and to many file formats)
 │   └── pixel_header.py  # PixelDataHeader (image metadata)
 ├── storage/             # File storage formats
 │   ├── dcb_file.py      # DCB file format implementations
@@ -27,32 +28,34 @@ dicube/
 │   ├── dicom_io.py      # DICOM file I/O
 │   └── merge_utils.py   # Metadata merging utilities
 ├── codecs/              # Compression codecs
-│   ├── jxl/            # JPEG XL codec (dcba format)
 │   └── jph/            # HTJ2K codec (dcbs format)
 └── exceptions.py        # Custom exceptions
 ```
 
 ## File Formats
 
-DiCube supports multiple file formats optimized for different use cases:
+DiCube defines three file format specifications for different use cases:
 
-### .dcba (JPEG XL format)
-- **Magic**: `DCMCUBEA`
-- **Codec**: JPEG XL compression
-- **Use case**: High-quality images with excellent compression
-- **Features**: Lossless and lossy modes, HDR support
-
-### .dcbs (HTJ2K format)  
+### .dcbs (Speed format) - **Currently Implemented**
 - **Magic**: `DCMCUBES`
-- **Codec**: High Throughput JPEG 2000
-- **Use case**: High-speed encoding/decoding
-- **Features**: Optimized for throughput
+- **Target**: I/O speed suitable for deep learning training while high compression ratio.
+- **Codec**: High Throughput JPEG 2000 (HTJ2K)
+- **Use case**: High-speed encoding/decoding for processing pipelines
+- **Features**: Optimized for throughput, lossless compression
 
-### .dcbr (ROI format)
-- **Magic**: `DCMCUBER` 
-- **Codec**: JPEG XL with separate foreground/background
-- **Use case**: Region-of-interest processing
-- **Features**: Different quality settings for FG/BG
+### .dcba (Archive format) - **Placeholder**
+- **Magic**: `DCMCUBEA`
+- **Target**: 20% better compression ratio than dcbs
+- **Use case**: Long-term storage and archiving
+- **Status**: Awaiting suitable codec that meets compression targets
+
+### .dcbl (Lossy format) - **Placeholder**
+- **Magic**: `DCMCUBEL`
+- **Target**: 60%+ compression ratio with imperceptible quality loss
+- **Use case**: High-compression scenarios where minor quality trade-offs are acceptable
+- **Status**: Awaiting suitable codec that meets quality/compression targets
+
+> **Codec Selection Philosophy**: We take a conservative approach to codec adoption, requiring extensive testing and clear performance benefits before implementation. This avoids the complexity issues seen in DICOM's numerous format variations.
 
 ## Key Classes and Interfaces
 
@@ -60,23 +63,22 @@ DiCube supports multiple file formats optimized for different use cases:
 Main interface for medical image handling:
 
 ```python
-from dicube import DicomCubeImage
+import dicube
 
 # Create from DICOM directory
-image = DicomCubeImage.from_dicom_folder('path/to/dicom/')
+image = dicube.load_from_dicom_folder('path/to/dicom/')
 
 # Create from NIfTI file
-image = DicomCubeImage.from_nifti('image.nii.gz')
+image = dicube.load_from_nifti('image.nii.gz')
 
-# Save to compressed format
-image.to_file('output.dcba')  # JPEG XL
-image.to_file('output.dcbs')  # HTJ2K
+# Save to compressed format (currently only dcbs is implemented)
+dicube.save(image, 'output.dcbs', file_type='s')  # HTJ2K (Speed format)
 
 # Load from file
-loaded_image = DicomCubeImage.from_file('output.dcba')
+loaded_image = dicube.load('output.dcbs')
 
 # Export back to DICOM
-image.to_dicom_folder('output_dicom/')
+dicube.save_to_dicom_folder(image, 'output_dicom/')
 
 # Get pixel data
 pixel_data = image.get_fdata()  # Returns float array
@@ -103,37 +105,7 @@ from dicube import get_dicom_status
 status = get_dicom_status(meta)
 ```
 
-### File Format Structure
 
-All DiCube formats share a common binary structure:
-
-```
-Header (100 bytes):
-├── magic: 8 bytes
-├── version: 4 bytes  
-├── dicom_status_offset: 8 bytes
-├── dicom_status_length: 8 bytes
-├── dicommeta_offset: 8 bytes
-├── dicommeta_length: 8 bytes
-├── space_offset: 8 bytes
-├── space_length: 8 bytes
-├── pixel_header_offset: 8 bytes
-├── pixel_header_length: 8 bytes
-├── frame_offsets_offset: 8 bytes
-├── frame_offsets_length: 8 bytes
-├── frame_lengths_offset: 8 bytes
-├── frame_lengths_length: 8 bytes
-└── frame_count: 8 bytes
-
-Data sections:
-├── DicomStatus (text)
-├── DicomMeta (compressed JSON)
-├── Space (JSON)
-├── PixelDataHeader (JSON)
-├── Frame offsets (binary)
-├── Frame lengths (binary)
-└── Compressed frame data
-```
 
 ## Integration with spacetransformer
 
@@ -143,7 +115,7 @@ DiCube uses `spacetransformer.Space` for 3D coordinate system handling:
 from spacetransformer import Space
 
 # DicomCubeImage automatically creates Space from DICOM
-image = DicomCubeImage.from_dicom_folder('dicom/')
+image = dicube.load_from_dicom_folder('dicom/')
 space = image.space  # spacetransformer.Space object
 
 # Apply spatial transformations
@@ -174,35 +146,32 @@ status = get_dicom_status(meta)
 
 ## Compression Codecs
 
-### JPEG XL (jxl/)
-- Files: `imageio_jxl.py`, Cython bindings
-- Functions: `imencode_jxl()`, `imdecode_jxl()`, `imencode_jxl_roi()`, `imdecode_jxl_roi()`
-- Build: Uses Cython for C++ bindings
-
 ### HTJ2K (jph/)
-- Files: `_encode.py`, `_decode.py`, pybind11 bindings  
-- Functions: `imencode_jph()`, `imdecode_jph()`
-- Build: Uses pybind11 for C++ bindings
+- **Status**: Currently implemented for .dcbs format
+- **Files**: `_encode.py`, `_decode.py`, pybind11 bindings  
+- **Functions**: `imencode_jph()`, `imdecode_jph()`
+- **Build**: Uses pybind11 for C++ bindings to OpenJPH library
+- **Performance**: Optimized for high-speed encoding/decoding
 
 ## Best Practices
 
 ### For Medical Images
 1. Always preserve DICOM metadata when possible
-2. Use `.dcba` format for archival storage (lossless JPEG XL)
-3. Use `.dcbs` format for processing pipelines (fast HTJ2K)
-4. Check DICOM status before processing: `get_dicom_status(meta)`
+2. Currently use `.dcbs` format for all storage needs (fast HTJ2K)
+3. Check DICOM status before processing: `get_dicom_status(meta)`
+4. Monitor for updates as `.dcba` and `.dcbl` formats become available
 
 ### For Integration
 1. Use spacetransformer for all spatial operations
 2. Use medmask for segmentation mask processing  
 3. Convert coordinates between voxel and world space using `Space` transforms
-4. Validate file format compatibility with `DicomCubeImage.from_file()`
+4. Validate file format compatibility with `dicube.load()`
 
 ### Performance Tips
 1. Use `num_threads` parameter for parallel compression
 2. For large datasets, process in chunks to manage memory
 3. Check DicomStatus before processing to avoid corrupted data
-4. Use ROI format (.dcbr) for images with distinct foreground/background
+4. Use HTJ2K's high-speed capabilities for processing pipelines
 
 ## Error Handling
 
@@ -216,7 +185,7 @@ from dicube.exceptions import (
 )
 
 try:
-    image = DicomCubeImage.from_file('corrupted.dcba')
+    image = dicube.load('corrupted.dcbs')
 except InvalidCubeFileError:
     print("Not a valid DiCube file")
 except CodecError:
@@ -234,29 +203,7 @@ except MetaDataError:
 - zstandard: Metadata compression
 
 ### Optional (for full functionality)
-- JPEG XL library: For .dcba format
-- OpenJPH library: For .dcbs format
+- OpenJPH library: For .dcbs format implementation
 - nibabel: For NIfTI file support
 
-## Migration Notes
-
-This library was extracted from DICOMCube with the following changes:
-1. **Removed**: All mask-related functionality (moved to medmask)
-2. **Removed**: 3D morphological operations 
-3. **Updated**: Space handling now uses spacetransformer
-4. **Simplified**: Focus on core image storage functionality
-5. **Maintained**: Full backward compatibility for .dcb* file formats
-
-## Build System
-
-The library includes C++ extensions that require compilation:
-
-### Cython Extensions (jxl/)
-- `_jpegxl.pyx` → `_jpegxl.cpython-*.so`
-- `_shared.pyx` → `_shared.cpython-*.so`
-
-### pybind11 Extensions (jph/)  
-- `encode_complete.cpp` → `ojph_complete.cpython-*.so`
-- `decode_complete.cpp` → `ojph_decode_complete.cpython-*.so`
-
-Build configuration should handle cross-platform compilation and library linking for JPEG XL and OpenJPH dependencies. 
+ 

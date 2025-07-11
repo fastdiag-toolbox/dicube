@@ -4,7 +4,7 @@ from .dicom_tags import CommonTags
 import numpy as np
 
 
-def get_space_from_DicomMeta(meta):
+def get_space_from_DicomMeta(meta, axis_order="xyz"):
     """
     Create a Space object from DICOM metadata.
 
@@ -61,4 +61,10 @@ def get_space_from_DicomMeta(meta):
         z_orientation=z_orientation,
         shape=shape,
     )
+    if axis_order == "xyz":
+        space = space
+    elif axis_order == "zyx":
+        space = space.reverse_axis_order()
+    else:
+        raise ValueError(f"Invalid axis order: {axis_order}")
     return space
