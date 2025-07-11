@@ -1,0 +1,102 @@
+name: Test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test Python ${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build build-essential
+
+    - name: Install system dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        brew install cmake ninja
+
+    - name: Install system dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        choco install cmake ninja
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install numpy pybind11[global] cmake ninja
+        pip install pytest pytest-cov
+
+    - name: Build extensions
+      run: |
+        python build_scripts/build_local.py --build-type Release
+
+    - name: Test import
+      run: |
+        python -c "
+        import dicube
+        from dicube.codecs.jph import JphCodec
+        codec = JphCodec()
+        print(f'JphCodec loaded: {codec.name}')
+        print(f'Available: {codec.is_available()}')
+        assert codec.is_available(), 'JphCodec should be available'
+        print('✓ Import test passed')
+        "
+
+    - name: Run functionality tests
+      run: |
+        python -c "
+        import numpy as np
+        from dicube.codecs.jph import JphCodec
+        
+        print('=== Functionality Tests ===')
+        codec = JphCodec()
+        
+        # Test basic encode/decode
+        test_image = np.random.randint(0, 256, (64, 64), dtype=np.uint8)
+        encoded = codec.encode(test_image)
+        decoded = codec.decode(encoded)
+        
+        assert decoded.shape == test_image.shape, f'Shape mismatch: {decoded.shape} != {test_image.shape}'
+        print(f'✓ Basic encode/decode test passed')
+        
+        # Test 3D image
+        test_3d = np.random.randint(0, 256, (32, 32, 3), dtype=np.uint8)
+        encoded_3d = codec.encode(test_3d)
+        decoded_3d = codec.decode(encoded_3d)
+        
+        assert decoded_3d.shape == test_3d.shape, f'3D shape mismatch: {decoded_3d.shape} != {test_3d.shape}'
+        print(f'✓ 3D encode/decode test passed')
+        
+        print('✓ All functionality tests passed')
+        "
+
+    - name: Run tests with pytest (if available)
+      run: |
+        if [ -d "tests" ]; then
+          pytest tests/ -v
+        else
+          echo "No tests directory found, skipping pytest"
+        fi
+      shell: bash 

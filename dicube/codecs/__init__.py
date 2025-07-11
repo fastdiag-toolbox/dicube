@@ -3,7 +3,7 @@ from __future__ import annotations
 """Image codec sub-package for dicube.
 
 This package defines the codec registry and base interface for image codecs.
-Currently supports JXL and JPH formats with extensible design for future formats.
+Currently supports JPH format with extensible design for future formats.
 """
 
 from typing import Dict, Protocol, runtime_checkable, Optional, Union, Any
@@ -24,8 +24,8 @@ class ImageCodec(Protocol):
     """Base interface that all image codecs must implement."""
 
     id: int  # unique numeric ID
-    name: str  # codec name (e.g. "jxl", "jph")
-    extensions: tuple[str, ...]  # supported file extensions (e.g. (".jxl",))
+    name: str  # codec name (e.g. "jph")
+    extensions: tuple[str, ...]  # supported file extensions (e.g. (".j2k",))
     
     def encode(
         self, 
@@ -88,7 +88,7 @@ def get_codec(name: str) -> ImageCodec:
     """Get codec by name (case-insensitive).
     
     Args:
-        name: Codec name (e.g. "jxl", "jph")
+        name: Codec name (e.g. "jph")
         
     Returns:
         Codec instance
@@ -112,7 +112,7 @@ def is_codec_available(name: str) -> bool:
     """Check if a codec is available.
     
     Args:
-        name: Codec name (e.g. "jxl", "jph")
+        name: Codec name (e.g. "jph")
         
     Returns:
         True if codec is available and functional, False otherwise

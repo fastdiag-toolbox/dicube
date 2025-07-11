@@ -22,7 +22,7 @@ class InvalidCubeFileError(DicomCubeError):
 class CodecError(DicomCubeError):
     """
     Raised when an error occurs in the encoding/decoding process
-    (e.g., JPEG-XL compression or decompression failures).
+    (e.g., JPEG 2000 compression or decompression failures).
     """
 
     pass

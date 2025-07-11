@@ -1,0 +1,91 @@
+[build-system]
+requires = [
+    "scikit-build-core>=0.5.0",
+    "pybind11[global]>=2.10.0", 
+    "numpy>=1.21.0",
+    "cmake>=3.12.0",
+    "ninja",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "dicube"
+version = "1.0.0"
+description = "Medical Image Storage Library with DICOM compatibility"
+readme = "README.md"
+authors = [{name = "liaofz"}]
+license = {text = "MIT"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+    "numpy>=1.21.0",
+    "pydicom>=2.3.0",
+    "zstandard>=0.18.0",
+]
+
+[project.optional-dependencies]
+jph = ["pybind11>=2.10.0"]
+nifti = ["nibabel>=3.2.0"]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=22.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "build>=0.8.0",
+]
+all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
+
+[project.urls]
+"Homepage" = "https://github.com/username/dicube"
+"Bug Reports" = "https://github.com/username/dicube/issues"
+"Source" = "https://github.com/username/dicube"
+
+[tool.scikit-build]
+cmake.build-type = "Release"
+build.verbose = true
+
+sdist.include = [
+    "source/OpenJPH/**/*",
+    "dicube/**/*", 
+    "CMakeLists.txt",
+    "build_scripts/*",
+]
+
+wheel.exclude = [
+    "dicube/**/*.cpp",
+    "dicube/**/*.h",
+]
+
+cmake.args = [
+    "-DOPENJPH_BUILD_STATIC=ON",
+    "-DICUBE_BUILD_PYTHON_EXTENSIONS=ON",
+    "-DCMAKE_BUILD_TYPE=Release",
+]
+
+[tool.scikit-build.cmake.define]
+"OPENJPH_BUILD_STATIC" = "ON"
+"DICUBE_BUILD_PYTHON_EXTENSIONS" = "ON"
+
+[tool.scikit-build.wheel.packages]
+"dicube" = "dicube"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"] 
