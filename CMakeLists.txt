@@ -105,6 +105,36 @@ set(OPENJPH_INCLUDE_DIRS
     "${CMAKE_BINARY_DIR}/openjph/src/core/common"  # 生成的配置文件
 )
 
+# 创建openjph头文件目录的符号链接，以支持 #include <openjph/ojph_file.h> 格式
+set(OPENJPH_HEADER_LINK_DIR "${CMAKE_BINARY_DIR}/openjph_headers")
+file(MAKE_DIRECTORY "${OPENJPH_HEADER_LINK_DIR}")
+
+# 创建openjph子目录的符号链接
+if(NOT EXISTS "${OPENJPH_HEADER_LINK_DIR}/openjph")
+    if(WIN32)
+        # Windows使用目录连接
+        execute_process(
+            COMMAND cmd /c mklink /J "${OPENJPH_HEADER_LINK_DIR}\\openjph" "${OPENJPH_SOURCE_DIR}\\src\\core\\common"
+            RESULT_VARIABLE LINK_RESULT
+        )
+    else()
+        # Unix系统使用符号链接
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -E create_symlink 
+                "${OPENJPH_SOURCE_DIR}/src/core/common"
+                "${OPENJPH_HEADER_LINK_DIR}/openjph"
+            RESULT_VARIABLE LINK_RESULT
+        )
+    endif()
+    
+    if(LINK_RESULT EQUAL 0)
+        message(STATUS "Created OpenJPH header symlink: ${OPENJPH_HEADER_LINK_DIR}/openjph")
+        list(APPEND OPENJPH_INCLUDE_DIRS "${OPENJPH_HEADER_LINK_DIR}")
+    else()
+        message(WARNING "Failed to create OpenJPH header symlink, falling back to direct include")
+    endif()
+endif()
+
 # ================================================================================================
 # Python 扩展构建配置
 # ================================================================================================
