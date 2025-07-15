@@ -29,18 +29,17 @@ jobs:
         CIBW_ARCHS_MACOS: x86_64 arm64
         CIBW_ARCHS_WINDOWS: auto
         
-        # Use manylinux for maximum Linux compatibility
-        CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
+        # Use more modern manylinux for easier dependency management
+        CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_17
+        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_17
         
         # Skip some builds
         CIBW_SKIP: cp36-* cp37-* pp* *-musllinux*
         
-        # Install dependencies for each platform
+        # Install dependencies for each platform - simplified for modern environment
         CIBW_BEFORE_ALL_LINUX: >
-          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* &&
-          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* &&
-          yum install -y cmake ninja-build gcc-c++ make git &&
+          yum update -y &&
+          yum install -y cmake ninja-build gcc-c++ make git python3-devel &&
           git --version
         
         CIBW_BEFORE_ALL_MACOS: >
@@ -52,7 +51,7 @@ jobs:
         # Install Python dependencies
         CIBW_BEFORE_BUILD: >
           pip install --upgrade pip setuptools wheel &&
-          pip install numpy pybind11[global] cmake ninja &&
+          pip install numpy pybind11[global] &&
           pip install pydicom>=2.3.0 zstandard>=0.18.0
         
         # Test core functionality only (avoid complex dependencies)

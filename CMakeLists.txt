@@ -140,83 +140,32 @@ endif()
 # ================================================================================================
 
 if(DICUBE_BUILD_PYTHON_EXTENSIONS)
-    # 查找 Python 和相关组件
+    # 使用scikit-build-core推荐的Python查找方式
+    find_package(Python REQUIRED COMPONENTS Interpreter Development.Module)
+    
+    # 添加调试信息
     message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
-    message(STATUS "Python_ROOT_DIR: ${Python_ROOT_DIR}")
-    message(STATUS "SKBUILD_PYTHON_EXECUTABLE: ${SKBUILD_PYTHON_EXECUTABLE}")
-    
-    if(DEFINED SKBUILD_PYTHON_EXECUTABLE)
-        # scikit-build-core设置了SKBUILD_PYTHON_EXECUTABLE
-        set(Python_EXECUTABLE ${SKBUILD_PYTHON_EXECUTABLE})
-    endif()
-    
-    if(DEFINED Python_EXECUTABLE)
-        # 如果已经定义了Python_EXECUTABLE，从路径推导Python_ROOT_DIR
-        get_filename_component(Python_ROOT_DIR ${Python_EXECUTABLE} DIRECTORY)
-        get_filename_component(Python_ROOT_DIR ${Python_ROOT_DIR} DIRECTORY)
-        message(STATUS "Using Python_EXECUTABLE: ${Python_EXECUTABLE}")
-        message(STATUS "Using Python_ROOT_DIR: ${Python_ROOT_DIR}")
-        
-        # 设置Python相关变量
-        set(Python_ROOT_DIR ${Python_ROOT_DIR})
-        set(CMAKE_PREFIX_PATH ${Python_ROOT_DIR} ${CMAKE_PREFIX_PATH})
-        
-        # 使用Python3查找（在manylinux中更可靠）
-        find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-        
-        # 设置Python变量以兼容后续代码
-        set(Python_EXECUTABLE ${Python3_EXECUTABLE})
-        set(Python_LIBRARIES ${Python3_LIBRARIES})
-        set(Python_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
-        set(Python_Development_FOUND ${Python3_Development_FOUND})
-    else()
-        # 否则使用默认查找方式
-        find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
-        set(Python_EXECUTABLE ${Python3_EXECUTABLE})
-        set(Python_LIBRARIES ${Python3_LIBRARIES})
-        set(Python_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
-        set(Python_Development_FOUND ${Python3_Development_FOUND})
-    endif()
+    message(STATUS "Python_LIBRARIES: ${Python_LIBRARIES}")
+    message(STATUS "Python_INCLUDE_DIRS: ${Python_INCLUDE_DIRS}")
+    message(STATUS "Python_VERSION: ${Python_VERSION}")
     
     # 查找 pybind11
-    find_package(pybind11 QUIET)
-    if(NOT pybind11_FOUND)
-        # 如果没有找到 pybind11，尝试通过 pip 安装的 pybind11
-        execute_process(
-            COMMAND ${Python_EXECUTABLE} -m pybind11 --cmakedir
-            OUTPUT_VARIABLE PYBIND11_CMAKE_DIR
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            RESULT_VARIABLE PYBIND11_RESULT
-        )
-        if(PYBIND11_RESULT EQUAL 0 AND EXISTS "${PYBIND11_CMAKE_DIR}")
-            list(APPEND CMAKE_PREFIX_PATH "${PYBIND11_CMAKE_DIR}")
-            find_package(pybind11 REQUIRED)
-        else()
-            message(FATAL_ERROR 
-                "pybind11 not found. Please install it:\n"
-                "  pip install pybind11[global]"
-            )
-        endif()
-    endif()
+    find_package(pybind11 REQUIRED)
     
     # 查找 NumPy
     execute_process(
         COMMAND ${Python_EXECUTABLE} -c "import numpy; print(numpy.get_include())"
         OUTPUT_VARIABLE NUMPY_INCLUDE_DIR
         OUTPUT_STRIP_TRAILING_WHITESPACE
-        RESULT_VARIABLE NUMPY_RESULT
     )
-    if(NOT NUMPY_RESULT EQUAL 0)
-        message(FATAL_ERROR 
-            "NumPy not found. Please install it:\n"
-            "  pip install numpy"
-        )
+    
+    if(NUMPY_INCLUDE_DIR)
+        message(STATUS "NumPy include directory: ${NUMPY_INCLUDE_DIR}")
+    else()
+        message(FATAL_ERROR "NumPy not found")
     endif()
     
-    # ================================================================================================
-    # 编码扩展模块
-    # ================================================================================================
-    
+    # 编译第一个pybind11扩展 - 编码器
     pybind11_add_module(ojph_complete
         dicube/codecs/jph/encode_complete.cpp
     )
@@ -230,20 +179,7 @@ if(DICUBE_BUILD_PYTHON_EXTENSIONS)
         ${OPENJPH_TARGET}
     )
     
-    target_compile_definitions(ojph_complete PRIVATE
-        VERSION_INFO="${PROJECT_VERSION}"
-    )
-    
-    # 设置输出路径和名称
-    set_target_properties(ojph_complete PROPERTIES
-        OUTPUT_NAME "ojph_complete"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph"
-    )
-    
-    # ================================================================================================
-    # 解码扩展模块  
-    # ================================================================================================
-    
+    # 编译第二个pybind11扩展 - 解码器
     pybind11_add_module(ojph_decode_complete
         dicube/codecs/jph/decode_complete.cpp
     )
@@ -257,42 +193,21 @@ if(DICUBE_BUILD_PYTHON_EXTENSIONS)
         ${OPENJPH_TARGET}
     )
     
-    target_compile_definitions(ojph_decode_complete PRIVATE
-        VERSION_INFO="${PROJECT_VERSION}"
+    # 设置输出属性
+    set_target_properties(ojph_complete PROPERTIES
+        OUTPUT_NAME "ojph_complete"
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
     )
     
-    # 设置输出路径和名称
     set_target_properties(ojph_decode_complete PROPERTIES
         OUTPUT_NAME "ojph_decode_complete"
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph"
+        LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
     )
     
-    # ================================================================================================
-    # 平台特定设置
-    # ================================================================================================
-    
-    if(WIN32)
-        # Windows 特定设置
-        target_compile_definitions(ojph_complete PRIVATE WIN32_LEAN_AND_MEAN)
-        target_compile_definitions(ojph_decode_complete PRIVATE WIN32_LEAN_AND_MEAN)
-    elseif(APPLE)
-        # macOS 特定设置
-        set_target_properties(ojph_complete ojph_decode_complete PROPERTIES
-            MACOSX_RPATH ON
-            INSTALL_RPATH_USE_LINK_PATH ON
-        )
-    endif()
-    
-    # ================================================================================================
-    # 安装规则（可选）
-    # ================================================================================================
-    
-    # 如果需要，可以添加安装规则
-    # install(TARGETS ojph_complete ojph_decode_complete
-    #     LIBRARY DESTINATION dicube/codecs/jph
-    # )
-    
-endif() # DICUBE_BUILD_PYTHON_EXTENSIONS
+    message(STATUS "Python extensions configured successfully")
+else()
+    message(STATUS "Python extensions are disabled")
+endif()
 
 # ================================================================================================
 # 构建信息输出
