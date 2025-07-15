@@ -35,6 +35,7 @@ dependencies = [
     "numpy>=1.21.0",
     "pydicom>=2.3.0",
     "zstandard>=0.18.0",
+    "spacetransformer-core>=0.1.0",
 ]
 
 [project.optional-dependencies]
