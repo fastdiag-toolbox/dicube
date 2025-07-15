@@ -61,7 +61,6 @@ all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
 cmake.build-type = "Release"
 build.verbose = true
 metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
-metadata.version.provider-path = "setuptools_scm"
 
 sdist.include = [
     "source/OpenJPH/**/*",
