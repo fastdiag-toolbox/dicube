@@ -1,0 +1,39 @@
+name: 'Setup Python Environment'
+description: 'Setup Python with common dependencies'
+inputs:
+  python-version:
+    description: 'Python version to use'
+    required: true
+    default: '3.9'
+  install-dev:
+    description: 'Install development dependencies'
+    required: false
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ inputs.python-version }}
+    
+    - name: Cache pip
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ inputs.python-version }}-${{ hashFiles('**/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ inputs.python-version }}-
+    
+    - name: Install base dependencies
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install wheel setuptools
+    
+    - name: Install dev dependencies
+      if: inputs.install-dev == 'true'
+      shell: bash
+      run: |
+        pip install ruff black mypy pytest pytest-cov 

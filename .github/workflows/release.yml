@@ -1,186 +1,86 @@
 name: Release
 
 on:
-  push:
-    tags: [ 'v*.*.*' ]
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (for manual dispatch)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
-  test-and-build:
-    name: Test and Build on ${{ matrix.os }} Python ${{ matrix.python-version }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
-
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install system dependencies (Linux)
-      if: runner.os == 'Linux'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y cmake ninja-build build-essential
-
-    - name: Install system dependencies (macOS)
-      if: runner.os == 'macOS'
-      run: |
-        brew install cmake ninja
-
-    - name: Install system dependencies (Windows)
-      if: runner.os == 'Windows'
-      run: |
-        choco install cmake ninja
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install numpy pybind11[global] cmake ninja
-        pip install pytest pytest-cov
-        pip install pydicom>=2.3.0 zstandard>=0.18.0 spacetransformer-core>=0.1.0
-        pip install build twine setuptools_scm
-
-    - name: Build extensions
-      run: |
-        python build_scripts/build_local.py --build-type Release
-
-    - name: Test import
-      run: |
-        python -c "
-        # Test basic imports first
-        import sys
-        print(f'Python version: {sys.version}')
-        
-        # Test codec import (no main dicube import to avoid dependencies)
-        try:
-            from dicube.codecs.jph import JphCodec
-            codec = JphCodec()
-            print(f'✓ JphCodec loaded: {codec.name}')
-            print(f'✓ Available: {codec.is_available()}')
-            assert codec.is_available(), 'JphCodec should be available'
-            print('✓ Core functionality test passed')
-        except Exception as e:
-            print(f'✗ Import test failed: {e}')
-            raise
-        "
-
-    - name: Run functionality tests
-      run: |
-        python -c "
-        import numpy as np
-        from dicube.codecs.jph import JphCodec
-        
-        print('=== Functionality Tests ===')
-        codec = JphCodec()
-        
-        # Test basic encode/decode
-        test_image = np.random.randint(0, 256, (64, 64), dtype=np.uint8)
-        encoded = codec.encode(test_image)
-        decoded = codec.decode(encoded)
-        
-        assert decoded.shape == test_image.shape, f'Shape mismatch: {decoded.shape} != {test_image.shape}'
-        print(f'✓ Basic encode/decode test passed')
-        
-        # Test 3D image
-        test_3d = np.random.randint(0, 256, (32, 32, 3), dtype=np.uint8)
-        encoded_3d = codec.encode(test_3d)
-        decoded_3d = codec.decode(encoded_3d)
-        
-        assert decoded_3d.shape == test_3d.shape, f'3D shape mismatch: {decoded_3d.shape} != {test_3d.shape}'
-        print(f'✓ 3D encode/decode test passed')
-        
-        print('✓ All functionality tests passed')
-        "
-
-    - name: Run tests with pytest (if available)
-      run: |
-        if [ -d "tests" ]; then
-          pytest tests/ -v
-        else
-          echo "No tests directory found, skipping pytest"
-        fi
-      shell: bash
-
-    - name: Build package
-      run: |
-        python -m build
-
-    - name: Upload artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: wheels-${{ matrix.os }}-${{ matrix.python-version }}
-        path: dist/*
-
-  release:
-    needs: test-and-build
+  # 构建 wheels 和 sdist
+  build:
+    uses: ./.github/workflows/build-wheels.yml
+  
+  # 发布到 GitHub Release
+  github-release:
     runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release'
     permissions:
       contents: write
-    
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-    
-    - name: Prepare release files
-      run: |
-        mkdir -p release
-        find artifacts -name "*.whl" -exec cp {} release/ \;
-        find artifacts -name "*.tar.gz" -exec cp {} release/ \;
-        ls -la release/
-    
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: release/*
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      
+      - name: List release assets
+        run: |
+          echo "📦 Release assets:"
+          ls -la dist/
+          echo "Total wheels: $(ls dist/*.whl 2>/dev/null | wc -l)"
+          echo "Source dist: $(ls dist/*.tar.gz 2>/dev/null | wc -l)"
+      
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
 
-  publish-to-pypi:
-    needs: test-and-build
+  # 发布到 PyPI
+  pypi-release:
     runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'release'
     environment: pypi
     permissions:
       id-token: write
-    
     steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-    
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-    
-    - name: Prepare PyPI files
-      run: |
-        mkdir -p dist
-        find artifacts -name "*.whl" -exec cp {} dist/ \;
-        find artifacts -name "*.tar.gz" -exec cp {} dist/ \;
-        ls -la dist/
-    
-    - name: Publish to PyPI
-      uses: pypa/gh-action-pypi-publish@release/v1 
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/
+          verbose: true
+
+  # 发布总结
+  release-summary:
+    runs-on: ubuntu-latest
+    needs: [github-release, pypi-release]
+    if: always()
+    steps:
+      - name: Release Summary
+        run: |
+          echo "## 🚀 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- GitHub Release: ${{ needs.github-release.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- PyPI Release: ${{ needs.pypi-release.result == 'success' && '✅ Success' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ "${{ needs.github-release.result }}" == "success" && "${{ needs.pypi-release.result }}" == "success" ]]; then
+            echo "✅ Release completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Release encountered issues" >> $GITHUB_STEP_SUMMARY
+          fi 
