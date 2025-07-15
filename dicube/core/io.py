@@ -3,7 +3,7 @@ import warnings
 from typing import Optional, Union
 
 import numpy as np
-from spacetransformer import Space, get_space_from_nifty
+from spacetransformer import Space, get_space_from_nifti
 
 from ..dicom import (
     CommonTags,
@@ -219,7 +219,7 @@ class DicomCubeImageIO:
             raise ImportError("需要安装nibabel才能读取NIfTI文件")
         
         nii = nib.load(nii_path)
-        space = get_space_from_nifty(nii)
+        space = get_space_from_nifti(nii)
         
         # 修复numpy数组警告
         raw_image, header = derive_pixel_header_from_array(
