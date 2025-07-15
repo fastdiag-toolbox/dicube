@@ -3,7 +3,8 @@ import warnings
 from typing import List, Optional
 
 import numpy as np
-from pydicom import Dataset, FileMetaDataset
+from pydicom import Dataset
+from pydicom.dataset import FileMetaDataset
 from pydicom.uid import JPEG2000, ExplicitVRLittleEndian, JPEG2000Lossless, generate_uid
 
 from ..dicom.dicom_meta import DicomMeta
