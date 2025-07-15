@@ -151,14 +151,31 @@ if(DICUBE_BUILD_PYTHON_EXTENSIONS)
     endif()
     
     if(DEFINED Python_EXECUTABLE)
-        # 如果已经定义了Python_EXECUTABLE，使用它
+        # 如果已经定义了Python_EXECUTABLE，从路径推导Python_ROOT_DIR
+        get_filename_component(Python_ROOT_DIR ${Python_EXECUTABLE} DIRECTORY)
+        get_filename_component(Python_ROOT_DIR ${Python_ROOT_DIR} DIRECTORY)
         message(STATUS "Using Python_EXECUTABLE: ${Python_EXECUTABLE}")
-        find_package(Python COMPONENTS Interpreter Development REQUIRED
-            HINTS ${Python_EXECUTABLE}
-        )
+        message(STATUS "Using Python_ROOT_DIR: ${Python_ROOT_DIR}")
+        
+        # 设置Python相关变量
+        set(Python_ROOT_DIR ${Python_ROOT_DIR})
+        set(CMAKE_PREFIX_PATH ${Python_ROOT_DIR} ${CMAKE_PREFIX_PATH})
+        
+        # 使用Python3查找（在manylinux中更可靠）
+        find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+        
+        # 设置Python变量以兼容后续代码
+        set(Python_EXECUTABLE ${Python3_EXECUTABLE})
+        set(Python_LIBRARIES ${Python3_LIBRARIES})
+        set(Python_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
+        set(Python_Development_FOUND ${Python3_Development_FOUND})
     else()
         # 否则使用默认查找方式
-        find_package(Python COMPONENTS Interpreter Development REQUIRED)
+        find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+        set(Python_EXECUTABLE ${Python3_EXECUTABLE})
+        set(Python_LIBRARIES ${Python3_LIBRARIES})
+        set(Python_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
+        set(Python_Development_FOUND ${Python3_Development_FOUND})
     endif()
     
     # 查找 pybind11
