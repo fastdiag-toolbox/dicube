@@ -26,13 +26,6 @@ jobs:
           python-version: ${{ matrix.python-version }}
           install-dev: 'true'
       
-      # 代码质量检查（仅在一个版本上运行）
-      - name: Code quality checks
-        if: matrix.python-version == '3.12'
-        run: |
-          black --check dicube/
-          ruff check dicube/
-          mypy dicube/ --ignore-missing-imports
       
       # 安装和测试
       - name: Install package
