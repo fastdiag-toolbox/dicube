@@ -29,17 +29,18 @@ jobs:
         CIBW_ARCHS_MACOS: x86_64 arm64
         CIBW_ARCHS_WINDOWS: auto
         
-        # Use more modern manylinux for easier dependency management
-        CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_17
-        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_17
+        # Use manylinux2014 - it's stable and widely supported
+        CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+        CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
         
         # Skip some builds
         CIBW_SKIP: cp36-* cp37-* pp* *-musllinux*
         
-        # Install dependencies for each platform - simplified for modern environment
+        # Install dependencies for each platform - simplified approach
         CIBW_BEFORE_ALL_LINUX: >
-          yum update -y &&
-          yum install -y cmake ninja-build gcc-c++ make git python3-devel &&
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* &&
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* &&
+          yum install -y cmake ninja-build gcc-c++ make git &&
           git --version
         
         CIBW_BEFORE_ALL_MACOS: >
