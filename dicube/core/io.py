@@ -232,25 +232,9 @@ class DicomCubeImageIO:
     def save_to_dicom_folder(
         image: 'DicomCubeImage',
         output_dir: str,
-        filenames: Optional[list] = None,
-        use_j2k: bool = False,
-        lossless: bool = True,
-        **compress_kwargs
+        **kwargs
     ) -> None:
-        """
-        保存DicomCubeImage为DICOM文件夹。
-        
-        Args:
-            image: 要保存的DicomCubeImage对象
-            output_dir: 输出目录路径
-            filenames: 可选的文件名列表
-            use_j2k: 是否使用JPEG 2000压缩
-            lossless: 是否使用无损压缩
-            **compress_kwargs: 压缩相关参数
-            
-        Raises:
-            ValueError: 当dicom_meta不存在时
-        """
+        """保存DicomCubeImage为DICOM文件夹"""
         if image.dicom_meta is None:
             warnings.warn("dicom_meta为None，使用默认值初始化")
             image.init_meta()
@@ -260,8 +244,5 @@ class DicomCubeImageIO:
             dicom_meta=image.dicom_meta,
             pixel_header=image.pixel_header,
             output_dir=output_dir,
-            filenames=filenames,
-            use_j2k=use_j2k,
-            lossless=lossless,
-            **compress_kwargs,
+            **kwargs
         ) 
