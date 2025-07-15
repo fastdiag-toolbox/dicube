@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from pathlib import Path
-from typing import Union, Any
+from typing import Union, Any, Tuple
 
 from .ojph_complete import encode_image
 from .ojph_decode_complete import decode_image
@@ -15,7 +15,7 @@ class JphCodec:
     
     id: int = 2
     name: str = "jph"
-    extensions: tuple[str, ...] = (".j2k", ".j2c", ".jp2")
+    extensions: Tuple[str, ...] = (".j2k", ".j2c", ".jp2")
     
     def encode(
         self, 

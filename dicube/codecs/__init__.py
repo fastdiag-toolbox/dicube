@@ -6,7 +6,7 @@ This package defines the codec registry and base interface for image codecs.
 Currently supports JPH format with extensible design for future formats.
 """
 
-from typing import Dict, Protocol, runtime_checkable, Optional, Union, Any
+from typing import Dict, Protocol, runtime_checkable, Optional, Union, Any, Tuple
 import numpy as np
 from pathlib import Path
 
@@ -25,7 +25,7 @@ class ImageCodec(Protocol):
 
     id: int  # unique numeric ID
     name: str  # codec name (e.g. "jph")
-    extensions: tuple[str, ...]  # supported file extensions (e.g. (".j2k",))
+    extensions: Tuple[str, ...]  # supported file extensions (e.g. (".j2k",))
     
     def encode(
         self, 

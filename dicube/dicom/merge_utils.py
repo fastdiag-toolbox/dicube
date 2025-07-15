@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 ###############################################################################
@@ -62,7 +62,7 @@ def _merge_dataset_list(
     return merged_data
 
 
-def _get_value_and_name(tv: Optional[Dict[str, Any]]) -> tuple[Optional[str], Any]:
+def _get_value_and_name(tv: Optional[Dict[str, Any]]) -> Tuple[Optional[str], Any]:
     """
     Extract the value and its field name from a tag value dictionary.
 
