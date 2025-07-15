@@ -141,7 +141,25 @@ endif()
 
 if(DICUBE_BUILD_PYTHON_EXTENSIONS)
     # 查找 Python 和相关组件
-    find_package(Python COMPONENTS Interpreter Development REQUIRED)
+    message(STATUS "Python_EXECUTABLE: ${Python_EXECUTABLE}")
+    message(STATUS "Python_ROOT_DIR: ${Python_ROOT_DIR}")
+    message(STATUS "SKBUILD_PYTHON_EXECUTABLE: ${SKBUILD_PYTHON_EXECUTABLE}")
+    
+    if(DEFINED SKBUILD_PYTHON_EXECUTABLE)
+        # scikit-build-core设置了SKBUILD_PYTHON_EXECUTABLE
+        set(Python_EXECUTABLE ${SKBUILD_PYTHON_EXECUTABLE})
+    endif()
+    
+    if(DEFINED Python_EXECUTABLE)
+        # 如果已经定义了Python_EXECUTABLE，使用它
+        message(STATUS "Using Python_EXECUTABLE: ${Python_EXECUTABLE}")
+        find_package(Python COMPONENTS Interpreter Development REQUIRED
+            HINTS ${Python_EXECUTABLE}
+        )
+    else()
+        # 否则使用默认查找方式
+        find_package(Python COMPONENTS Interpreter Development REQUIRED)
+    endif()
     
     # 查找 pybind11
     find_package(pybind11 QUIET)

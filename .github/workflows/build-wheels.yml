@@ -40,7 +40,7 @@ jobs:
         CIBW_BEFORE_ALL_LINUX: >
           sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-* &&
           sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-* &&
-          yum install -y cmake ninja-build gcc-c++ make git &&
+          yum install -y cmake ninja-build gcc-c++ make git python-devel python3-devel &&
           git --version
         
         CIBW_BEFORE_ALL_MACOS: >
