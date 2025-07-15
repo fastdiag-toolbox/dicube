@@ -38,8 +38,7 @@ jobs:
         
         # Install dependencies for each platform
         CIBW_BEFORE_ALL_LINUX: >
-          yum install -y cmake3 ninja-build gcc-c++ make git &&
-          ln -sf /usr/bin/cmake3 /usr/bin/cmake &&
+          yum install -y cmake ninja-build gcc-c++ make git &&
           git --version
         
         CIBW_BEFORE_ALL_MACOS: >
@@ -58,15 +57,7 @@ jobs:
         CIBW_TEST_REQUIRES: >
           numpy
         CIBW_TEST_COMMAND: >
-          python -c "from dicube.codecs.jph import JphCodec; 
-          import numpy as np;
-          codec = JphCodec(); 
-          assert codec.is_available(), 'JphCodec not available';
-          img = np.ones((32, 32), dtype=np.uint8);
-          encoded = codec.encode(img);
-          decoded = codec.decode(encoded);
-          assert decoded.shape == img.shape, 'Decode shape mismatch';
-          print('✓ Wheel test passed')"
+          python -c "from dicube.codecs.jph import JphCodec; import numpy as np; codec = JphCodec(); assert codec.is_available(), 'JphCodec not available'; img = np.ones((32, 32), dtype=np.uint8); encoded = codec.encode(img); decoded = codec.decode(encoded); assert decoded.shape == img.shape, 'Decode shape mismatch'; print('✓ Wheel test passed')"
         
         # Environment variables
         CIBW_ENVIRONMENT_LINUX: >
