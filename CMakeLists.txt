@@ -49,7 +49,7 @@ endif()
 # ================================================================================================
 
 # 检查 OpenJPH 源码
-set(OPENJPH_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openjph")
+set(OPENJPH_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/source/OpenJPH")
 if(NOT EXISTS "${OPENJPH_SOURCE_DIR}/CMakeLists.txt")
     message(FATAL_ERROR 
         "OpenJPH source not found. Please run: git submodule update --init --recursive"

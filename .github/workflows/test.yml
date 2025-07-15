@@ -21,16 +21,6 @@ jobs:
         with:
           submodules: recursive
       
-      # 确保子模块被正确初始化
-      - name: Ensure submodules are initialized
-        run: |
-          git submodule update --init --recursive
-          if [ ! -f "openjph/CMakeLists.txt" ]; then
-            echo "Error: OpenJPH submodule not properly initialized"
-            exit 1
-          fi
-          echo "OpenJPH submodule initialized successfully"
-      
       - uses: ./.github/actions/setup-python-env
         with:
           python-version: ${{ matrix.python-version }}
@@ -48,6 +38,6 @@ jobs:
           # 基本导入测试
           python -c "
           import dicube
-          from dicube.codecs.jph import JPHCodec
+          from dicube.codecs.jph import JphCodec
           print(f'✅ dicube version: {dicube.__version__}')
           " 
