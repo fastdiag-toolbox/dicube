@@ -9,7 +9,10 @@ from .dicom import (
     read_dicom_dir,
 )
 
-__version__ = "1.0.0"
+try:
+    from ._version import __version__
+except ImportError:
+    __version__ = "0.1.0"
 
 # 顶层便利方法
 def load(filename: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:

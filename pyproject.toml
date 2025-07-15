@@ -5,12 +5,13 @@ requires = [
     "numpy>=1.21.0",
     "cmake>=3.12.0",
     "ninja",
+    "setuptools_scm",
 ]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "dicube"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Medical Image Storage Library with DICOM compatibility"
 readme = "README.md"
 authors = [{name = "liaofz"}]
@@ -59,6 +60,8 @@ all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
 [tool.scikit-build]
 cmake.build-type = "Release"
 build.verbose = true
+metadata.version.provider = "scikit_build_core.metadata.setuptools_scm"
+metadata.version.provider-path = "setuptools_scm"
 
 sdist.include = [
     "source/OpenJPH/**/*",
@@ -89,4 +92,9 @@ cmake.args = [
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
-python_functions = ["test_*"] 
+python_functions = ["test_*"]
+
+[tool.setuptools_scm]
+write_to = "dicube/_version.py"
+version_scheme = "python-simplified-semver"
+local_scheme = "no-local-version" 
