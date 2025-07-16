@@ -187,7 +187,7 @@ class DcbFile:
         dicom_meta: Optional[DicomMeta] = None,
         space: Optional[Space] = None,
         num_threads: int = 4,
-        dicom_status: Optional[str] = None,
+        dicom_status: Optional[DicomStatus] = None,
     ):
         """Write image data and metadata to a DCB file.
 
@@ -213,9 +213,14 @@ class DcbFile:
             if hasattr(pixel_header, "DicomStatus"):
                 dicom_status = pixel_header.DicomStatus
             else:
-                dicom_status = DicomStatus.CONSISTENT.value
+                dicom_status = DicomStatus.CONSISTENT
 
-        dicom_status_bin = dicom_status.encode("utf-8")
+        # Handle both enum and string values for dicom_status
+        if isinstance(dicom_status, DicomStatus):
+            dicom_status_bin = dicom_status.value.encode("utf-8")
+        else:
+            # If it's already a string, encode it directly
+            dicom_status_bin = dicom_status.encode("utf-8")
 
         # (2) Process dicom_meta
         if dicom_meta:
@@ -554,7 +559,7 @@ class DcbFile:
             f.seek(dicom_status_offset)
             dicom_status_bin = f.read(dicom_status_length)
 
-        return dicom_status_bin.decode("utf-8")
+        return DicomStatus(dicom_status_bin.decode("utf-8"))
     
     def get_transfer_syntax_uid(self) -> Optional[str]:
         """Get the DICOM transfer syntax UID for this file.

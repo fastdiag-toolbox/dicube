@@ -2,14 +2,15 @@ import json
 import os
 import warnings
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pydicom
+from pydicom.tag import Tag
+from pydicom import datadict
 from pydicom.uid import generate_uid
 
-from .dicom_tags import CommonTags, Tag, parse_tag
-from .merge_utils import _get_value_and_name, _merge_dataset_list, _slice_merged_data
+from .dicom_tags import CommonTags, get_tag_key
 
 
 ###############################################################################
@@ -31,44 +32,48 @@ class SortMethod(Enum):
     POSITION_LEFT_HAND = 4
 
 
-def _get_projection_location(meta: "DicomMeta"):
-    """Calculate projection locations for datasets.
-
-    Uses ImageOrientationPatient and ImagePositionPatient to calculate
-    the projection location for each dataset along the normal vector.
-
+def _get_projection_location(meta: "DicomMeta") -> List[float]:
+    """Calculate projection locations for each dataset along the slice direction.
+    
+    Uses the normal vector from ImageOrientationPatient and positions from
+    ImagePositionPatient to compute the projection distance for each slice.
+    
     Args:
-        meta (DicomMeta): DicomMeta object containing the datasets.
-
+        meta: DicomMeta instance containing the required tags
+        
     Returns:
-        list: Projection locations for each dataset.
-
+        List[float]: List of projection locations, one for each dataset
+        
     Raises:
-        ValueError: If ImageOrientationPatient is not found or invalid.
+        ValueError: If ImageOrientationPatient is not found or invalid
     """
-    # Get ImageOrientationPatient - shared
-    orientation_entry = meta._merged_data.get(CommonTags.IMAGE_ORIENTATION_PATIENT.key)
-    if orientation_entry and "Value" in orientation_entry:
-        orientation = orientation_entry["Value"]
-        # Convert orientation values to float
-        orientation = [float(v) for v in orientation]
-        row_orientation = np.array(orientation[:3])
-        col_orientation = np.array(orientation[3:])
-        normal_vector = np.cross(row_orientation, col_orientation)
-    else:
+    # Get ImageOrientationPatient - should be shared
+    if not meta.is_shared(CommonTags.ImageOrientationPatient):
+        raise ValueError("ImageOrientationPatient is not shared across datasets.")
+        
+    orientation = meta.get_shared_value(CommonTags.ImageOrientationPatient)
+    if not orientation:
         raise ValueError("ImageOrientationPatient not found or invalid.")
-
+        
+    # Convert orientation values to float
+    orientation = [float(v) for v in orientation]
+    row_orientation = np.array(orientation[:3])
+    col_orientation = np.array(orientation[3:])
+    normal_vector = np.cross(row_orientation, col_orientation)
+    
     # Get positions for each dataset
-    positions = meta.get(CommonTags.IMAGE_POSITION_PATIENT, force_nonshared=True)
+    positions = meta.get_values(CommonTags.ImagePositionPatient)
+    
     projection_locations = []
     for pos in positions:
         if pos:
-            # Convert position values to float
-            pos = [float(v) for v in pos]
-            projection_location = np.dot(pos, normal_vector)
-            projection_locations.append(projection_location)
+            position_array = np.array([float(v) for v in pos])
+            # Project position onto normal vector
+            projection = np.dot(position_array, normal_vector)
+            projection_locations.append(projection)
         else:
             projection_locations.append(None)
+    
     return projection_locations
 
 
@@ -97,6 +102,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
         pandas.DataFrame: Formatted metadata tables.
     """
     import pandas as pd
+    from .dicom_tags import CommonTags
 
     # Prepare shared and non-shared data
     shared_data = []
@@ -112,84 +118,64 @@ def _display(meta, show_shared=True, show_non_shared=True):
 
     # Define priority tags for ordering
     priority_shared_tags = [
-        CommonTags.PATIENT_NAME,
-        CommonTags.PATIENT_ID,
-        CommonTags.STUDY_DATE,
-        CommonTags.STUDY_DESCRIPTION,
-        CommonTags.SERIES_DESCRIPTION,
-        CommonTags.MODALITY,
+        CommonTags.PatientName,
+        CommonTags.PatientID,
+        CommonTags.StudyDate,
+        CommonTags.StudyDescription,
+        CommonTags.SeriesDescription,
+        CommonTags.Modality,
         # Add other common shared tags as needed
     ]
 
     priority_non_shared_tags = [
-        CommonTags.INSTANCE_NUMBER,
-        CommonTags.SLICE_LOCATION,
-        CommonTags.IMAGE_POSITION_PATIENT,
+        CommonTags.InstanceNumber,
+        CommonTags.SliceLocation,
+        CommonTags.ImagePositionPatient,
         # Add other common non-shared tags as needed
     ]
 
-    # Process each tag in the combined dataset
-    for tag_key, tag_entry in meta.items():
-        # Create Tag object from tag_key
-        tag_obj = Tag(int(tag_key[:4], 16), int(tag_key[4:], 16), "")
-        # Try to get name from CommonTags
-        try:
-            tag_obj.name = CommonTags.get_tag_by_tuple(
-                (tag_obj.group, tag_obj.element)
-            ).name
-        except KeyError:
-            tag_obj.name = pydicom.datadict.keyword_for_tag(
-                (tag_obj.group, tag_obj.element)
-            )
-
-        if "shared" in tag_entry:
-            if tag_entry["shared"]:
-                if not show_shared:
-                    continue
-                # Shared tag
-                value = tag_entry.get("Value")
-                # Skip sequences for simplicity
-                if tag_entry["vr"] != "SQ":
-                    shared_data.append(
-                        {
-                            "Tag": tag_obj.format_tag(),
-                            "Name": tag_obj.name,
-                            "Value": value,
-                        }
-                    )
-            else:
-                if not show_non_shared:
-                    continue
-                # Non-shared tag
-                values = tag_entry.get("Value")
-                if tag_entry["vr"] != "SQ":
-                    non_shared_tags.append(tag_obj)
-                    non_shared_data[tag_obj.key] = {
-                        "Name": tag_obj.name,
-                        "Values": values,
-                    }
+    # Process each tag
+    for tag_key in meta.keys():
+        tag = Tag(int(tag_key[:4], 16), int(tag_key[4:], 16))
+        tag_name = datadict.dicom_dict_summary.get(tag, {}).get("name", f"({tag.group:04X},{tag.element:04X})")
+        vr = meta.get_vr(tag)
+        
+        if meta.is_shared(tag):
+            if show_shared and vr != "SQ":  # Skip sequences for simplicity
+                value = meta.get_shared_value(tag)
+                shared_data.append({
+                    "Tag": f"({tag.group:04X},{tag.element:04X})",
+                    "Name": tag_name,
+                    "Value": value,
+                })
         else:
-            # Process sequences
-            if tag_entry.get("vr") == "SQ" and "Value" in tag_entry:
-                # For display purposes, we might skip sequences or implement similar logic
-                pass
+            if show_non_shared and vr != "SQ":
+                values = meta.get_values(tag)
+                non_shared_tags.append(tag)
+                non_shared_data[tag_key] = {
+                    "Name": tag_name,
+                    "Values": values,
+                }
 
     # Sort shared tags, prioritizing common tags
     def tag_sort_key(tag_info):
-        tag_key = tag_info["Tag"].replace("(", "").replace(")", "").replace(",", "")
-        if tag_key in [t.key for t in priority_shared_tags]:
-            return (0, [t.key for t in priority_shared_tags].index(tag_key))
-        else:
-            return (1, tag_info["Tag"])
+        tag_str = tag_info["Tag"]
+        tag_obj = Tag(int(tag_str[1:5], 16), int(tag_str[6:10], 16))
+        if any(tag_obj == priority_tag for priority_tag in priority_shared_tags):
+            for i, priority_tag in enumerate(priority_shared_tags):
+                if tag_obj == priority_tag:
+                    return (0, i)
+        return (1, tag_str)
 
     shared_data.sort(key=tag_sort_key)
 
     # Sort non-shared tags, prioritizing common tags
     def non_shared_sort_key(tag_obj):
-        if tag_obj.key in [t.key for t in priority_non_shared_tags]:
-            return (0, [t.key for t in priority_non_shared_tags].index(tag_obj.key))
-        else:
-            return (1, tag_obj.format_tag())
+        if any(tag_obj == priority_tag for priority_tag in priority_non_shared_tags):
+            for i, priority_tag in enumerate(priority_non_shared_tags):
+                if tag_obj == priority_tag:
+                    return (0, i)
+        return (1, f"({tag_obj.group:04X},{tag_obj.element:04X})")
 
     non_shared_tags.sort(key=non_shared_sort_key)
 
@@ -208,20 +194,20 @@ def _display(meta, show_shared=True, show_non_shared=True):
         if non_shared_tags:
             # Create the tag and name rows
             tag_row = {
-                tag_obj.format_tag(): tag_obj.format_tag()
-                for tag_obj in non_shared_tags
+                f"({tag.group:04X},{tag.element:04X})": f"({tag.group:04X},{tag.element:04X})"
+                for tag in non_shared_tags
             }
             name_row = {
-                tag_obj.format_tag(): non_shared_data[tag_obj.key]["Name"]
-                for tag_obj in non_shared_tags
+                f"({tag.group:04X},{tag.element:04X})": non_shared_data[tag.key]["Name"]
+                for tag in non_shared_tags
             }
 
             # Collect values for each dataset
             values_rows = []
             for idx in range(meta.num_datasets):
                 row = {
-                    tag_obj.format_tag(): non_shared_data[tag_obj.key]["Values"][idx]
-                    for tag_obj in non_shared_tags
+                    f"({tag.group:04X},{tag.element:04X})": non_shared_data[tag.key]["Values"][idx]
+                    for tag in non_shared_tags
                 }
                 values_rows.append(row)
 
@@ -274,7 +260,11 @@ class DicomMeta:
                 break
         else:
             # If no non-shared fields are found, default to 1
-            self.num_datasets = 1
+            if filenames is not None:
+                self.num_datasets = len(filenames)
+            else:
+                warnings.warn("No filenames provided, defaulting to 1 dataset")
+                self.num_datasets = 1
 
     @classmethod
     def from_datasets(
@@ -290,6 +280,8 @@ class DicomMeta:
         Returns:
             DicomMeta: A new DicomMeta instance created from the datasets.
         """
+        from .merge_utils import _merge_dataset_list
+        
         if not datasets:
             return cls({}, filenames)
 
@@ -327,173 +319,138 @@ class DicomMeta:
         merged_data = data["_merged_data"]
         return cls(merged_data, filenames)
 
-    def get(
-        self,
-        key: Union[str, Tag, tuple],
-        force_shared: bool = False,
-        force_nonshared: bool = False,
-    ) -> Any:
-        """Get a value from the DicomMeta.
 
+    def get_values(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> List[Any]:
+        """Get values for a tag across all datasets.
+        
         Args:
-            key (Union[str, Tag, tuple]): Tag key as a string, Tag object, or tuple.
-            force_shared (bool): If True, treat the tag as shared even if it's not.
-                Defaults to False.
-            force_nonshared (bool): If True, treat the tag as non-shared even if it's shared.
-                Defaults to False.
-
+            tag_input: The tag to retrieve, can be a Tag object, string, or (group, element) tuple
+            
         Returns:
-            Any: The value associated with the key. If the tag is shared, returns a list with
-                a single value. If the tag is non-shared, returns a list of values for each dataset.
-
-        Raises:
-            KeyError: If the key is not found in the merged data.
+            List[Any]: List of values, one for each dataset. May contain None for datasets
+                      where the tag is not present.
         """
-        # Convert key to string if needed
-        if isinstance(key, Tag):
-            tag_key = key.key
-        elif isinstance(key, tuple):
-            tag_key = f"{key[0]:04x}{key[1]:04x}"
-        else:
-            tag_key = key
-
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        
         # Get tag entry
         tag_entry = self._merged_data.get(tag_key)
-        if tag_entry is None:
+        if tag_entry is None or "Value" not in tag_entry:
             return [None] * self.num_datasets
-
-        # Get value based on shared status
-        if "Value" not in tag_entry:
-            return [None] * self.num_datasets
-
-        if tag_entry.get("shared") and not force_nonshared:
-            # For shared tags, return a list with the same value for all datasets
+            
+        # Return values based on shared status
+        if tag_entry.get("shared", False):
+            # For shared tags, return the same value for all datasets
             return [tag_entry["Value"]] * self.num_datasets
         else:
             # For non-shared tags, return the list of values
-            if force_shared:
-                # If forcing shared, return the first non-None value
-                values = tag_entry["Value"]
-                for value in values:
-                    if value is not None:
-                        return [value] * self.num_datasets
-                return [None] * self.num_datasets
-            else:
-                return tag_entry["Value"]
+            return tag_entry["Value"]
 
-    def __getitem__(self, key: Union[str, tuple, Tag]) -> tuple:
-        """Get a value from the DicomMeta (dictionary-style access).
-
-        This method is a shorthand for `get(key)` and returns the values as a tuple
-        instead of a list.
-
+    def is_shared(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> bool:
+        """Check if a tag has consistent values across all datasets.
+        
         Args:
-            key (Union[str, tuple, Tag]): Tag key as a string, Tag object, or tuple.
-
+            tag_input: The tag to check, can be a Tag object, string, or (group, element) tuple
+        
         Returns:
-            tuple: The values associated with the key.
-
-        Raises:
-            KeyError: If the key is not found in the merged data.
+            bool: True if tag is shared (same value across all datasets), False otherwise
         """
-        return tuple(self.get(key))
+        tag = Tag(tag_input)  # pydicom's Tag constructor handles various input formats
+        tag_key = get_tag_key(tag)
+        
+        tag_entry = self._merged_data.get(tag_key)
+        if tag_entry is None:
+            return False
+            
+        return tag_entry.get("shared", False)
 
-    def _format_vr_value(self, value: Any, vr: str) -> Any:
-        """Format a value based on its Value Representation (VR).
 
+    def is_missing(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> bool:
+        """Check if a tag is missing from the metadata.
+        
         Args:
-            value (Any): The value to format.
-            vr (str): The DICOM Value Representation (VR) code.
-
+            tag_input: The tag to check, can be a Tag object, string, or (group, element) tuple
+        
         Returns:
-            Any: The formatted value according to the VR.
+            bool: True if tag is missing or has no value, False if present with a value
         """
-        if value is None:
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        
+        tag_entry = self._merged_data.get(tag_key)
+        return tag_entry is None or "Value" not in tag_entry
+
+
+    def get_shared_value(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> Any:
+        """Get the shared value for a tag if it's shared across all datasets.
+        
+        Args:
+            tag_input: The tag to retrieve, can be a Tag object, string, or (group, element) tuple
+        
+        Returns:
+            Any: The shared value if tag is shared, None if not shared or missing
+        """
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        
+        tag_entry = self._merged_data.get(tag_key)
+        if tag_entry is None or "Value" not in tag_entry:
             return None
-
-        # Handle common VR types
-        if vr in ("DS", "FL", "FD"):
-            return float(value)
-        elif vr in ("IS", "SL", "SS", "UL", "US"):
-            return int(value)
-        elif vr == "SQ":
-            # Sequences are handled separately
+            
+        if tag_entry.get("shared", False):
+            value = tag_entry["Value"]
+            # If the value is a single-item list, extract the item
+            if isinstance(value, list) and len(value) == 1:
+                return value[0]
             return value
-        else:
-            # For all other VRs, return as is
-            return value
+            
+        return None
 
-    def set_shared_item(self, key: Union[str, tuple, Tag], value: Any):
-        """Set a shared metadata item for all datasets.
 
+    def get_vr(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> str:
+        """Get the Value Representation (VR) for a tag.
+        
         Args:
-            key (Union[str, tuple, Tag]): Tag key as a string, Tag object, or tuple.
-            value (Any): The value to set for the tag.
+            tag_input: The tag to check, can be a Tag object, string, or (group, element) tuple
+        
+        Returns:
+            str: The VR code (e.g., "CS", "LO", "SQ") or empty string if not found
         """
-        # Convert key to string if needed
-        if isinstance(key, Tag):
-            tag_key = key.key
-            tag_vr = key.vr
-        elif isinstance(key, tuple):
-            tag_obj = CommonTags.get_tag_by_tuple(key)
-            tag_key = tag_obj.key
-            tag_vr = tag_obj.vr
-        else:
-            tag_key = key
-            tag_obj = parse_tag(key)
-            tag_vr = tag_obj.vr
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        
+        tag_entry = self._merged_data.get(tag_key)
+        if tag_entry is None:
+            return ""
+            
+        return tag_entry.get("vr", "")
 
-        # Get existing entry or create new one
-        tag_entry = self._merged_data.get(tag_key, {})
-        tag_entry["vr"] = tag_vr
-        tag_entry["shared"] = True
 
-        # Format the value based on VR
-        formatted_value = self._format_vr_value(value, tag_vr)
-        tag_entry["Value"] = formatted_value
-
-        # Update the merged data
-        self._merged_data[tag_key] = tag_entry
-
-    def set_nonshared_item(self, key: Union[str, tuple, Tag], values: List[Any]):
-        """Set a non-shared metadata item with different values for each dataset.
-
+    def __getitem__(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> Tuple[Any, Optional[str]]:
+        """Get a value and status for a tag (dictionary-style access).
+        
+        This method is useful for compatibility with status checkers that
+        need to know both the value and whether it's shared across datasets.
+        
         Args:
-            key (Union[str, tuple, Tag]): Tag key as a string, Tag object, or tuple.
-            values (List[Any]): List of values, one for each dataset.
-
-        Raises:
-            ValueError: If the length of values doesn't match the number of datasets.
+            tag_input: The tag to retrieve, can be a Tag object, string, or (group, element) tuple
+            
+        Returns:
+            Tuple[Any, Optional[str]]: A tuple containing:
+                - The value or list of values
+                - Status string ('shared', 'non_shared', or None if missing)
         """
-        if len(values) != self.num_datasets:
-            raise ValueError(
-                f"Length of values ({len(values)}) must match the number of datasets ({self.num_datasets})"
-            )
-
-        # Convert key to string if needed
-        if isinstance(key, Tag):
-            tag_key = key.key
-            tag_vr = key.vr
-        elif isinstance(key, tuple):
-            tag_obj = CommonTags.get_tag_by_tuple(key)
-            tag_key = tag_obj.key
-            tag_vr = tag_obj.vr
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        
+        tag_entry = self._merged_data.get(tag_key)
+        if tag_entry is None or "Value" not in tag_entry:
+            return (None, None)
+            
+        if tag_entry.get("shared", False):
+            return (tag_entry["Value"], "shared")
         else:
-            tag_key = key
-            tag_obj = parse_tag(key)
-            tag_vr = tag_obj.vr
-
-        # Get existing entry or create new one
-        tag_entry = self._merged_data.get(tag_key, {})
-        tag_entry["vr"] = tag_vr
-        tag_entry["shared"] = False
-
-        # Format the values based on VR
-        formatted_values = [self._format_vr_value(value, tag_vr) for value in values]
-        tag_entry["Value"] = formatted_values
-
-        # Update the merged data
-        self._merged_data[tag_key] = tag_entry
+            return (tag_entry["Value"], "non_shared")
 
     def keys(self) -> List[str]:
         """Get all tag keys in the DicomMeta.
@@ -519,23 +476,60 @@ class DicomMeta:
         """
         return len(self._merged_data)
 
-    def _sort_sequence(self, sequence_list, sort_index):
-        """Sort a sequence list based on the sort_index.
-
+    def set_shared_item(self, tag_input: Union[str, Tag, Tuple[int, int]], value: Any) -> None:
+        """Set a shared metadata item for all datasets.
+        
         Args:
-            sequence_list (List): List of sequences to sort.
-            sort_index (List[int]): List of indices to use for sorting.
-
-        Returns:
-            List: Sorted sequence list.
+            tag_input: The tag to set, can be a Tag object, string, or (group, element) tuple
+            value: The value to set for the tag across all datasets
         """
-        # If the sequence list is None or empty, return as is
-        if not sequence_list:
-            return sequence_list
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        vr = datadict.dictionary_VR(tag)
+        
+        # Get existing entry or create new one
+        tag_entry = self._merged_data.get(tag_key, {})
+        
+        # Update the entry
+        if not isinstance(value, list):
+            value = [value]
+        tag_entry["Value"] = value
+        tag_entry["vr"] = vr
+        tag_entry["shared"] = True
+        
+        # Store the updated entry
+        self._merged_data[tag_key] = tag_entry
 
-        # Create a new sequence list sorted by the sort_index
-        sorted_sequence = [sequence_list[i] if i < len(sequence_list) else None for i in sort_index]
-        return sorted_sequence
+
+    def set_nonshared_item(self, tag_input: Union[str, Tag, Tuple[int, int]], values: List[Any]) -> None:
+        """Set a non-shared metadata item with different values for each dataset.
+        
+        Args:
+            tag_input: The tag to set, can be a Tag object, string, or (group, element) tuple
+            values: List of values, one for each dataset
+            
+        Raises:
+            ValueError: If the number of values doesn't match the number of datasets
+        """
+        if len(values) != self.num_datasets:
+            raise ValueError(
+                f"Number of values ({len(values)}) does not match number of datasets ({self.num_datasets})"
+            )
+
+        tag = Tag(tag_input)
+        tag_key = get_tag_key(tag)
+        vr = datadict.dictionary_VR(tag)
+        
+        # Get existing entry or create new one
+        tag_entry = self._merged_data.get(tag_key, {})
+        
+        # Update the entry
+        tag_entry["Value"] = values
+        tag_entry["vr"] = vr
+        tag_entry["shared"] = False
+        
+        # Store the updated entry
+        self._merged_data[tag_key] = tag_entry
 
     def sort_files(
         self,
@@ -550,6 +544,7 @@ class DicomMeta:
         Raises:
             ValueError: If the sort method is not supported.
         """
+        from .dicom_tags import CommonTags
 
         def safe_int(v):
             """Convert a value to integer safely.
@@ -568,7 +563,7 @@ class DicomMeta:
         # Determine sort order based on method
         if sort_method == SortMethod.INSTANCE_NUMBER_ASC:
             # Get instance numbers
-            instance_numbers = self.get(CommonTags.INSTANCE_NUMBER, force_nonshared=True)
+            instance_numbers = self.get_values(CommonTags.InstanceNumber)
             indices = list(range(self.num_datasets))
             # Convert to integers for sorting
             int_values = [safe_int(v) for v in instance_numbers]
@@ -579,7 +574,7 @@ class DicomMeta:
 
         elif sort_method == SortMethod.INSTANCE_NUMBER_DESC:
             # Get instance numbers
-            instance_numbers = self.get(CommonTags.INSTANCE_NUMBER, force_nonshared=True)
+            instance_numbers = self.get_values(CommonTags.InstanceNumber)
             indices = list(range(self.num_datasets))
             # Convert to integers for sorting
             int_values = [safe_int(v) for v in instance_numbers]
@@ -623,15 +618,12 @@ class DicomMeta:
                 values = tag_entry.get("Value", [])
                 tag_entry["Value"] = [values[i] if i < len(values) else None for i in sorted_indices]
 
-            # Recursively handle sequences
-            if tag_entry.get("vr") == "SQ" and "Value" in tag_entry:
-                self._sort_sequence(tag_entry["Value"], sorted_indices)
-
         # Reorder filenames if available
         if self.filenames:
             self.filenames = [
                 self.filenames[i] if i < len(self.filenames) else None for i in sorted_indices
             ]
+        return sorted_indices
 
     def display(self, show_shared=True, show_non_shared=True):
         """Display the DicomMeta in a tabular format.
@@ -659,6 +651,7 @@ class DicomMeta:
         Returns:
             DicomMeta: A new DicomMeta containing only the specified dataset.
         """
+        from .merge_utils import _slice_merged_data
         return _slice_merged_data(self, index)
 
 
@@ -696,11 +689,13 @@ def read_dicom_dir(
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found: {directory}")
 
-    # Find all DICOM files in the directory
-    dicom_files = []
+    # Find all DICOM files in the directory - using a set to avoid duplicates
+    dicom_files_set = set()
     for file_extension in ["", ".dcm", ".DCM", ".ima", ".IMA"]:
         pattern = os.path.join(directory, f"*{file_extension}")
-        dicom_files.extend(glob.glob(pattern))
+        dicom_files_set.update(glob.glob(pattern))
+    
+    dicom_files = list(dicom_files_set)  # Convert back to list
 
     # Filter out non-DICOM files
     valid_files = []
@@ -738,8 +733,8 @@ def read_dicom_dir(
 
     # Sort the files if needed
     if sort_method is not None:
-        meta.sort_files(sort_method)
+        sorted_indices = meta.sort_files(sort_method)
         # Reorder datasets to match the meta order
-        datasets = [datasets[i] for i in range(len(datasets))]
+        datasets = [datasets[i] for i in sorted_indices]
 
     return meta, datasets 

@@ -1,315 +1,121 @@
-from typing import Any, Tuple, Union
+from pydicom.tag import Tag
+from typing import Union, Tuple, Set
 
-# Utility Functions
 
-
-def parse_tag(
-    input: Union[str, Tuple[Union[int, str], Union[int, str]], "Tag"]
-) -> "Tag":
-    """Parse a DICOM tag key from various input formats.
-
+def get_tag_key(tag: Tag) -> str:
+    """Get the hexadecimal string representation of a DICOM Tag (format: 'ggggeeee').
+    
     Args:
-        input (Union[str, Tuple[Union[int, str], Union[int, str]], Tag]): The input can be:
-            - A string in format "00100010" or "(0010,0010)"
-            - A tuple of integers or strings like (0x0010, 0x0020) or ("0010", "0020")
-            - A Tag object
-
+        tag: pydicom Tag object
+        
     Returns:
-        Tag: A Tag object representing the DICOM tag.
-
-    Raises:
-        ValueError: If the input format is invalid or cannot be parsed.
+        str: Hexadecimal string, e.g., '00100020' for PatientID
     """
-    if isinstance(input, Tag):
-        # If already a Tag object, try to get more information from CommonTags
-        try:
-            return CommonTags.get_tag_by_tuple((input.group, input.element))
-        except ValueError:
-            return input
-
-    if isinstance(input, tuple):
-        if len(input) != 2:
-            raise ValueError("Tuple input must have exactly two elements.")
-        group, element = input
-        if isinstance(group, str):
-            group = int(group, 16)
-        if isinstance(element, str):
-            element = int(element, 16)
-        # Try to get from CommonTags
-        try:
-            return CommonTags.get_tag_by_tuple((group, element))
-        except ValueError:
-            return Tag(group, element)
-
-    if isinstance(input, str):
-        input = input.strip()
-        if len(input) == 8:  # e.g., "00100010"
-            group = int(input[:4], 16)
-            element = int(input[4:], 16)
-        elif (
-            len(input) == 10 and input.startswith("(") and input.endswith(")")
-        ):  # e.g., "(0010,0010)"
-            parts = input[1:-1].split(",")
-            if len(parts) == 2:
-                group = int(parts[0], 16)
-                element = int(parts[1], 16)
-        else:
-            # Try to extract group and element from other formats
-            parts = input.replace("(", "").replace(")", "").split(",")
-            if len(parts) == 2:
-                group = int(parts[0], 16)
-                element = int(parts[1], 16)
-            else:
-                raise ValueError(f"Invalid input format: {input}")
-
-        # Try to get from CommonTags
-        try:
-            return CommonTags.get_tag_by_tuple((group, element))
-        except ValueError:
-            return Tag(group, element)
-
-    raise ValueError(f"Invalid input format: {input}")
-
-
-def format_tag(tag: "Tag") -> str:
-    """Format a Tag object into a DICOM standard string representation.
-
-    Args:
-        tag (Tag): The Tag object to format.
-
-    Returns:
-        str: A formatted string in format "(XXXX,XXXX)".
-    """
-    return f"({tag.group:04X},{tag.element:04X})"
-
-
-def format_key(input: Any) -> str:
-    """Format a Tag or tuple into an 8-character hexadecimal key.
-
-    Args:
-        input (Any): A Tag object or (group, element) tuple.
-
-    Returns:
-        str: An 8-character hexadecimal key (e.g., "00100020").
-    """
-    if isinstance(input, Tag):
-        return f"{input.group:04X}{input.element:04X}"
-    if isinstance(input, tuple):
-        return f"{input[0]:04X}{input[1]:04X}"
-
-
-class Tag:
-    """A class representing a DICOM tag with group, element, name and VR.
-
-    Attributes:
-        group (int): Group number of the DICOM tag (e.g., 0x0010).
-        element (int): Element number of the DICOM tag (e.g., 0x0020).
-        name (str): Human-readable name of the tag (e.g., "Patient ID").
-        vr (str): Value Representation of the tag (e.g., "PN", "DA").
-    """
-
-    def __init__(self, group: int, element: int, name: str = "", vr: str = ""):
-        """Initialize a Tag instance.
-
-        Args:
-            group (int): Group number of the DICOM tag.
-            element (int): Element number of the DICOM tag.
-            name (str, optional): Human-readable name of the tag. Defaults to "".
-            vr (str, optional): Value Representation of the tag. Defaults to "".
-        """
-        self.group = group
-        self.element = element
-        self.name = name
-        self.vr = vr
-
-    def __repr__(self):
-        """Get the string representation of the tag for debugging.
-
-        Returns:
-            str: Format: Tag((XXXX,XXXX), 'name', 'VR').
-        """
-        return f"Tag({format_tag(self)}, '{self.name}', '{self.vr}')"
-
-    def __str__(self):
-        """Get the human-readable string representation of the tag.
-
-        Returns:
-            str: Format: name (XXXX,XXXX) [VR].
-        """
-        return f"{self.name} {format_tag(self)} [{self.vr}]"
-
-    def __eq__(self, other):
-        """Compare this tag with another tag or tuple.
-
-        Args:
-            other (Union[Tag, Tuple[int, int]]): Another Tag instance or (group, element) tuple.
-
-        Returns:
-            bool: True if the tags have the same group and element.
-        """
-        if isinstance(other, Tag):
-            return (self.group, self.element) == (other.group, other.element)
-        elif isinstance(other, tuple):
-            return (self.group, self.element) == other
-        return False
-
-    def __hash__(self):
-        """Get the hash value of the tag.
-
-        Returns:
-            int: Hash value based on group and element.
-        """
-        return hash((self.group, self.element))
-
-    @property
-    def key(self):
-        """Get the tag key in 8-digit hex format.
-
-        Returns:
-            str: Format: XXXXXXXX (e.g., '00100020').
-        """
-        return f"{self.group:04X}{self.element:04X}"
-
-    @property
-    def tag(self):
-        """Get the tag as a tuple of group and element.
-
-        Returns:
-            tuple: Format: (group, element).
-        """
-        return (self.group, self.element)
-
-    def format_tag(self):
-        """Format the tag in DICOM standard format.
-
-        Returns:
-            str: Format: (XXXX,XXXX).
-        """
-        return format_tag(self)
-
-
-# CommonTags Class
+    return f"{tag:08X}"  # or format(tag, "08X")
 
 
 class CommonTags:
-    """Collection of commonly used DICOM tags as Tag instances.
-
-    Organized into categories:
-    - Patient Information
-    - Study Information
-    - Series Information
-    - Image Information
-    - Modality Information
-    - Pixel Data
-    - Manufacturer Information
-    - Other Common Tags
+    """Common DICOM tags used throughout the library.
+    
+    This class provides convenient access to frequently used DICOM tags
+    organized by category (patient, study, series, instance, etc.).
+    All tags are pydicom Tag objects.
     """
-
-    # Patient Information
-    PATIENT_NAME = Tag(0x0010, 0x0010, "Patient Name", "PN")
-    PATIENT_ID = Tag(0x0010, 0x0020, "Patient ID", "LO")
-    PATIENT_BIRTH_DATE = Tag(0x0010, 0x0030, "Patient Birth Date", "DA")
-    PATIENT_SEX = Tag(0x0010, 0x0040, "Patient Sex", "CS")
-    PATIENT_AGE = Tag(0x0010, 0x1010, "Patient Age", "AS")
-    PATIENT_WEIGHT = Tag(0x0010, 0x1030, "Patient Weight", "DS")
-
-    # Study Information
-    STUDY_INSTANCE_UID = Tag(0x0020, 0x000D, "Study Instance UID", "UI")
-    STUDY_DATE = Tag(0x0008, 0x0020, "Study Date", "DA")
-    STUDY_TIME = Tag(0x0008, 0x0030, "Study Time", "TM")
-    STUDY_ID = Tag(0x0020, 0x0010, "Study ID", "SH")
-    STUDY_DESCRIPTION = Tag(0x0008, 0x1030, "Study Description", "LO")
-    ACCESSION_NUMBER = Tag(0x0008, 0x0050, "Accession Number", "SH")
-
-    # Series Information
-    SERIES_INSTANCE_UID = Tag(0x0020, 0x000E, "Series Instance UID", "UI")
-    SERIES_NUMBER = Tag(0x0020, 0x0011, "Series Number", "IS")
-    SERIES_DESCRIPTION = Tag(0x0008, 0x103E, "Series Description", "LO")
-
-    # Image Information
-    SOP_INSTANCE_UID = Tag(0x0008, 0x0018, "SOP Instance UID", "UI")
-    INSTANCE_NUMBER = Tag(0x0020, 0x0013, "Instance Number", "IS")
-    IMAGE_POSITION_PATIENT = Tag(0x0020, 0x0032, "Image Position (Patient)", "DS")
-    IMAGE_ORIENTATION_PATIENT = Tag(0x0020, 0x0037, "Image Orientation (Patient)", "DS")
-    SLICE_LOCATION = Tag(0x0020, 0x1041, "Slice Location", "DS")
-    PIXEL_SPACING = Tag(0x0028, 0x0030, "Pixel Spacing", "DS")
-    SLICE_THICKNESS = Tag(0x0018, 0x0050, "Slice Thickness", "DS")
-    ROWS = Tag(0x0028, 0x0010, "Rows", "US")
-    COLUMNS = Tag(0x0028, 0x0011, "Columns", "US")
-    BITS_ALLOCATED = Tag(0x0028, 0x0100, "Bits Allocated", "US")
-    BITS_STORED = Tag(0x0028, 0x0101, "Bits Stored", "US")
-    HIGH_BIT = Tag(0x0028, 0x0102, "High Bit", "US")
-    PIXEL_REPRESENTATION = Tag(0x0028, 0x0103, "Pixel Representation", "US")
-    PHOTOMETRIC_INTERPRETATION = Tag(0x0028, 0x0004, "Photometric Interpretation", "CS")
-    SAMPLES_PER_PIXEL = Tag(0x0028, 0x0002, "Samples Per Pixel", "US")
-    RESCALE_INTERCEPT = Tag(0x0028, 0x1052, "Rescale Intercept", "DS")
-    RESCALE_SLOPE = Tag(0x0028, 0x1053, "Rescale Slope", "DS")
-    WINDOW_CENTER = Tag(0x0028, 0x1050, "Window Center", "DS")
-    WINDOW_WIDTH = Tag(0x0028, 0x1051, "Window Width", "DS")
-    PATIENT_POSITION = Tag(0x0018, 0x5100, "Patient Position", "CS")
-    BODY_PART_EXAMINED = Tag(0x0018, 0x0015, "Body Part Examined", "CS")
-
-    # Modality Information
-    MODALITY = Tag(0x0008, 0x0060, "Modality", "CS")
-
-    # Pixel Data
-    PIXEL_DATA = Tag(0x7FE0, 0x0010, "Pixel Data", "OW")
-
+    
+    # Patient tags
+    PatientID = Tag("PatientID")
+    PatientName = Tag("PatientName")
+    PatientBirthDate = Tag("PatientBirthDate")
+    PatientSex = Tag("PatientSex")
+    PatientAge = Tag("PatientAge")
+    PatientWeight = Tag("PatientWeight")
+    
+    # Study tags
+    StudyInstanceUID = Tag("StudyInstanceUID")
+    StudyID = Tag("StudyID")
+    StudyDate = Tag("StudyDate")
+    StudyTime = Tag("StudyTime")
+    AccessionNumber = Tag("AccessionNumber")
+    StudyDescription = Tag("StudyDescription")
+    
+    # Series tags
+    SeriesInstanceUID = Tag("SeriesInstanceUID")
+    SeriesNumber = Tag("SeriesNumber")
+    Modality = Tag("Modality")
+    SeriesDescription = Tag("SeriesDescription")
+    
+    # Instance tags
+    SOPInstanceUID = Tag("SOPInstanceUID")
+    SOPClassUID = Tag("SOPClassUID")
+    InstanceNumber = Tag("InstanceNumber")
+    
+    # Image tags
+    Rows = Tag("Rows")
+    Columns = Tag("Columns")
+    BitsAllocated = Tag("BitsAllocated")
+    BitsStored = Tag("BitsStored")
+    HighBit = Tag("HighBit")
+    SamplesPerPixel = Tag("SamplesPerPixel")
+    PhotometricInterpretation = Tag("PhotometricInterpretation")
+    PixelRepresentation = Tag("PixelRepresentation")
+    
+    # Spatial tags
+    ImagePositionPatient = Tag("ImagePositionPatient")
+    ImageOrientationPatient = Tag("ImageOrientationPatient")
+    PixelSpacing = Tag("PixelSpacing")
+    SliceThickness = Tag("SliceThickness")
+    SpacingBetweenSlices = Tag("SpacingBetweenSlices")
+    SliceLocation = Tag("SliceLocation")
+    
+    # Value transformations
+    RescaleIntercept = Tag("RescaleIntercept")
+    RescaleSlope = Tag("RescaleSlope")
+    WindowCenter = Tag("WindowCenter")
+    WindowWidth = Tag("WindowWidth")
+    PatientPosition = Tag("PatientPosition")
+    BodyPartExamined = Tag("BodyPartExamined")
+    
+    # Pixel data
+    PixelData = Tag("PixelData")
+    
+    # Enhanced MR specific tags
+    DimensionIndexSequence = Tag("DimensionIndexSequence")
+    FrameContentSequence = Tag("FrameContentSequence")
+    
+    # UID tags
+    ImplementationClassUID = Tag("ImplementationClassUID")
+    
+    # Other important tags
+    TransferSyntaxUID = Tag("TransferSyntaxUID")
+    MediaStorageSOPClassUID = Tag("MediaStorageSOPClassUID")
+    MediaStorageSOPInstanceUID = Tag("MediaStorageSOPInstanceUID")
+    SpecificCharacterSet = Tag("SpecificCharacterSet")
+        
     # Manufacturer Information
-    MANUFACTURER = Tag(0x0008, 0x0070, "Manufacturer", "LO")
-    MANUFACTURER_MODEL_NAME = Tag(0x0008, 0x1090, "Manufacturer's Model Name", "LO")
-    SOFTWARE_VERSION = Tag(0x0018, 0x1020, "Software Version(s)", "LO")
-
+    Manufacturer = Tag("Manufacturer")
+    ManufacturerModelName = Tag("ManufacturerModelName")
+    SoftwareVersions = Tag("SoftwareVersions")
+    
     # Other Common Tags
-    FRAME_OF_REFERENCE_UID = Tag(0x0020, 0x0052, "Frame of Reference UID", "UI")
-    REFERENCED_IMAGE_SEQUENCE = Tag(0x0008, 0x1140, "Referenced Image Sequence", "SQ")
-    REFERENCED_SOP_INSTANCE_UID = Tag(
-        0x0008, 0x1155, "Referenced SOP Instance UID", "UI"
-    )
-    ACQUISITION_NUMBER = Tag(0x0020, 0x0012, "Acquisition Number", "IS")
-    CONTRAST_AGENT = Tag(0x0018, 0x0010, "Contrast Agent", "LO")
-    FLUORO_RATE = Tag(0x0018, 0x1151, "Fluoroscopy Rate", "DS")
-    FLUORO_TIME = Tag(0x0018, 0x1150, "Fluoroscopy Total Time", "DS")
-
-    @classmethod
-    def get_tag_by_name(cls, name: str) -> Tag:
-        """Get a tag by its human-readable name.
-
-        Args:
-            name (str): The human-readable name of the tag.
-
-        Returns:
-            Tag: The tag with the specified name.
-
-        Raises:
-            ValueError: If no tag with the specified name is found.
-        """
-        name = name.strip()
-        for attr in dir(cls):
-            if attr.startswith("_"):  # Skip private attributes
-                continue
-            tag = getattr(cls, attr)
-            if isinstance(tag, Tag) and tag.name.lower() == name.lower():
-                return tag
-        raise ValueError(f"No tag found with name '{name}'")
-
-    @classmethod
-    def get_tag_by_tuple(cls, tag_tuple: Tuple[int, int]) -> Tag:
-        """Get a tag by its (group, element) tuple.
-
-        Args:
-            tag_tuple (Tuple[int, int]): The (group, element) tuple of the tag.
-
-        Returns:
-            Tag: The tag with the specified group and element.
-
-        Raises:
-            ValueError: If no tag with the specified tuple is found.
-        """
-        for attr in dir(cls):
-            if attr.startswith("_"):  # Skip private attributes
-                continue
-            tag = getattr(cls, attr)
-            if isinstance(tag, Tag) and (tag.group, tag.element) == tag_tuple:
-                return tag
-        raise ValueError(f"No tag found with tuple {tag_tuple}") 
+    FrameOfReferenceUID = Tag("FrameOfReferenceUID")
+    ReferencedImageSequence = Tag("ReferencedImageSequence")
+    ReferencedSOPInstanceUID = Tag("ReferencedSOPInstanceUID")
+    AcquisitionNumber = Tag("AcquisitionNumber")
+    ContrastBolusAgent = Tag("ContrastBolusAgent")
+    
+    # Tag sets for hierarchical DICOM levels
+    PATIENT_LEVEL_TAGS: Set[Tag] = {
+        PatientID, PatientName, PatientBirthDate, PatientSex
+    }
+    
+    STUDY_LEVEL_TAGS: Set[Tag] = {
+        StudyInstanceUID, StudyID, StudyDate, StudyTime, AccessionNumber
+    }
+    
+    SERIES_LEVEL_TAGS: Set[Tag] = {
+        SeriesInstanceUID, SeriesNumber, Modality
+    }
+    
+    INSTANCE_LEVEL_TAGS: Set[Tag] = {
+        SOPInstanceUID, SOPClassUID, InstanceNumber
+    } 

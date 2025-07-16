@@ -52,7 +52,7 @@ def test_dicom_cube_image_basic_operations():
     assert img.shape == (5, 64, 64)
     
     # 测试元数据初始化
-    img.init_meta(modality='CT', patient_name='TEST_PATIENT')
+    img.init_meta(modality='CT', patient_name='TEST^PATIENT')
     assert img.dicom_meta is not None
     
     # 测试浮点数据获取
@@ -95,7 +95,7 @@ def test_dicom_cube_image_to_dicom_folder():
     )
     
     image = DicomCubeImage(raw_data, pixel_header=pixel_header)
-    image.init_meta(modality='CT', patient_name='TEST_PATIENT')
+    image.init_meta(modality='CT', patient_name='TEST^PATIENT')
     
     with tempfile.TemporaryDirectory() as temp_dir:
         output_dir = os.path.join(temp_dir, "test_output")
@@ -134,8 +134,8 @@ def test_dicom_cube_image_metadata():
     
     # 验证元数据内容
     from dicube.dicom.dicom_tags import CommonTags
-    patient_name = image.dicom_meta.get(CommonTags.PATIENT_NAME)
-    modality = image.dicom_meta.get(CommonTags.MODALITY)
+    patient_name = image.dicom_meta.get_shared_value(CommonTags.PatientName)
+    modality = image.dicom_meta.get_shared_value(CommonTags.Modality)
     
     assert patient_name is not None
     assert modality is not None

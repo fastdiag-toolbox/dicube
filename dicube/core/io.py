@@ -31,11 +31,10 @@ class DicomCubeImageIO:
     
     @staticmethod
     def save(
-        image: 'DicomCubeImage',
+        image: "DicomCubeImage",
         filename: str,
         file_type: str = "s",
         num_threads: int = 4,
-        **kwargs
     ) -> None:
         """Save DicomCubeImage to a file.
         
@@ -45,7 +44,6 @@ class DicomCubeImageIO:
             file_type (str): File type, "s" (speed priority), "a" (compression priority), 
                              or "l" (lossy compression). Defaults to "s".
             num_threads (int): Number of parallel encoding threads. Defaults to 4.
-            **kwargs: Additional parameters passed to the underlying writer.
             
         Raises:
             ValueError: If the file_type is not supported.
@@ -67,7 +65,7 @@ class DicomCubeImageIO:
             dicom_meta=image.dicom_meta,
             space=image.space,
             num_threads=num_threads,
-            **kwargs
+            dicom_status=image.dicom_status
         )
     
     @staticmethod
@@ -106,21 +104,20 @@ class DicomCubeImageIO:
         dicom_meta = reader.read_meta()
         space = reader.read_space()
         pixel_header = reader.read_pixel_header()
+        dicom_status = reader.read_dicom_status()
         
         images = reader.read_images(num_threads=num_threads)
         if isinstance(images, list):
-            if len(images) == 0:
-                raw_image = np.array([], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE)
-            else:
-                raw_image = np.stack(images, axis=0)
-        else:
-            raw_image = images
+            # Convert list to ndarray if needed
+            images = np.stack(images)
+        
         
         return DicomCubeImage(
-            raw_image=raw_image,
+            raw_image=images,
             pixel_header=pixel_header,
             dicom_meta=dicom_meta,
             space=space,
+            dicom_status=dicom_status,
         )
     
     @staticmethod
@@ -179,10 +176,10 @@ class DicomCubeImageIO:
                 space = None
         
         # Get rescale parameters
-        slope = meta.get(CommonTags.RESCALE_SLOPE, force_shared=True)[0]
-        intercept = meta.get(CommonTags.RESCALE_INTERCEPT, force_shared=True)[0]
-        wind_center = meta.get(CommonTags.WINDOW_CENTER, force_shared=True)
-        wind_width = meta.get(CommonTags.WINDOW_WIDTH, force_shared=True)
+        slope = meta.get_shared_value(CommonTags.RescaleSlope)
+        intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
+        wind_center = meta.get_shared_value(CommonTags.WindowCenter)
+        wind_width = meta.get_shared_value(CommonTags.WindowWidth)
         
         # Create pixel_header
         pixel_header = PixelDataHeader(
@@ -190,11 +187,11 @@ class DicomCubeImageIO:
             RESCALE_INTERCEPT=float(intercept) if intercept is not None else 0.0,
             ORIGINAL_PIXEL_DTYPE=str(images[0].dtype),
             PIXEL_DTYPE=str(images[0].dtype),
-            WINDOW_CENTER=float(wind_center[0]) if wind_center is not None else None,
-            WINDOW_WIDTH=float(wind_width[0]) if wind_width is not None else None,
+            WINDOW_CENTER=float(wind_center) if wind_center is not None else None,
+            WINDOW_WIDTH=float(wind_width) if wind_width is not None else None,
         )
         
-        return DicomCubeImage(np.array(images), pixel_header, meta, space)
+        return DicomCubeImage(np.array(images), pixel_header, meta, space, dicom_status=status)
     
     @staticmethod
     def load_from_nifti(nii_path: str, **kwargs) -> 'DicomCubeImage':

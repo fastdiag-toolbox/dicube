@@ -25,16 +25,16 @@ def get_space_from_DicomMeta(meta, axis_order="xyz"):
         ValueError: If required DICOM tags are missing or invalid
     """
 
-    num_images = len(meta)
+    num_images = meta.num_datasets
     status = get_dicom_status(meta)
     if status not in (DicomStatus.CONSISTENT, DicomStatus.NON_UNIFORM_RESCALE_FACTOR):
         return None
-    spacing = meta.get(CommonTags.PIXEL_SPACING, force_shared=True)
+    spacing = meta.get_shared_value(CommonTags.PixelSpacing)
     spacing = [float(s) for s in spacing]
     positions = np.array(
-        meta.get(CommonTags.IMAGE_POSITION_PATIENT, force_nonshared=True)
+        meta.get_values(CommonTags.ImagePositionPatient)
     )
-    orientation = meta.get(CommonTags.IMAGE_ORIENTATION_PATIENT, force_shared=True)
+    orientation = meta.get_shared_value(CommonTags.ImageOrientationPatient)
     orientation = [float(s) for s in orientation]
     origin = positions[0].tolist()
     if num_images > 1:
@@ -43,14 +43,14 @@ def get_space_from_DicomMeta(meta, axis_order="xyz"):
         z_step_vector = diff / (num_images - 1)
         spacing.append(float(np.linalg.norm(z_step_vector)))
     else:
-        thickness = meta.get(CommonTags.SLICE_THICKNESS, force_shared=True)
+        thickness = meta.get_shared_value(CommonTags.SliceThickness)
         if thickness is None:
             thickness = 1
         spacing.append(float(thickness))
         z_orientation = np.cross(orientation[:3], orientation[3:6]).tolist()
     shape = [
-        int(meta.get(CommonTags.COLUMNS, force_shared=True)[0]),
-        int(meta.get(CommonTags.ROWS, force_shared=True)[0]),
+        int(meta.get_shared_value(CommonTags.Columns)),
+        int(meta.get_shared_value(CommonTags.Rows)),
         num_images,
     ]
     space = Space(

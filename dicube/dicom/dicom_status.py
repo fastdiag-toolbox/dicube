@@ -1,8 +1,8 @@
 from enum import Enum
 
 import numpy as np
+from pydicom.tag import Tag
 
-# Adjust the import based on your project structure
 from .dicom_tags import CommonTags
 
 
@@ -119,144 +119,141 @@ def get_dicom_status(meta) -> DicomStatus:
     - Z-axis location sequence
 
     Args:
-        meta: Object providing access to DICOM metadata (e.g., DicomMeta instance)
-             Must support meta[Tag] -> (value, status) interface
+        meta: DicomMeta instance providing access to DICOM metadata
 
     Returns:
         DicomStatus: The status enum value representing the check results
     """
     # --------------------------  Series UID --------------------------
-    series_uid_value, series_uid_status = meta[CommonTags.SERIES_INSTANCE_UID]
-    if series_uid_status is None:
+    if meta.is_missing(CommonTags.SeriesInstanceUID):
         return DicomStatus.MISSING_SERIES_UID
-    if series_uid_status == "non_shared":
+    if not meta.is_shared(CommonTags.SeriesInstanceUID):
         return DicomStatus.NON_UNIFORM_SERIES_UID
 
     # --------------------------  Instance Number --------------------------
-    instance_num_value, instance_num_status = meta[CommonTags.INSTANCE_NUMBER]
-    # 若没有取到任何 instance number
-    if instance_num_status is None:
+    if meta.is_missing(CommonTags.InstanceNumber):
         return DicomStatus.MISSING_INSTANCE_NUMBER
 
-    # instance_num_value 可能是单值（shared）或列表（non_shared）
-    # 如果只有一张图像且 status='shared'，可将其视为单列表
-    if instance_num_status == "shared":
-        # 判断 meta 是否只有一张图像
-        # 这里假设 meta.num_images() 或 len(meta) 可以拿到图像数量
-        if len(meta) == 1:
-            instance_numbers = [instance_num_value]  # 仅一帧
-        else:
-            return DicomStatus.DUPLICATE_INSTANCE_NUMBERS
+    # Get instance numbers (always treat as non-shared for this check)
+    instance_numbers = meta.get_values(CommonTags.InstanceNumber)
+    
+    # Check for single image
+    if meta.num_datasets == 1:
+        # Single image is fine, continue to next check
+        pass
     else:
-        # non_shared: instance_num_value 应该是一个 list
-        instance_numbers = instance_num_value
+        # Check for duplicate instance numbers
+        if len(set(instance_numbers)) < len(instance_numbers):
+            return DicomStatus.DUPLICATE_INSTANCE_NUMBERS
 
-    # 检查是否有重复
-    if len(set(instance_numbers)) < len(instance_numbers):
-        return DicomStatus.DUPLICATE_INSTANCE_NUMBERS
-
-    # 检查是否有gap
-    # 例如期待连续: 1,2,3,4,...，若 diff 中有大于1的 => GAP_INSTANCE_NUMBER
-    sorted_inst = np.sort(instance_numbers)
-    diffs_inst = np.diff(sorted_inst)
-    if len(diffs_inst) > 0 and not np.all(diffs_inst == 1):
-        return DicomStatus.GAP_INSTANCE_NUMBER
+        # Check for gaps in instance numbering
+        # First convert to integers and sort
+        try:
+            int_instances = [int(num) if num is not None else None for num in instance_numbers]
+            sorted_instances = sorted([num for num in int_instances if num is not None])
+            
+            # If we have a sequence with more than one image
+            if len(sorted_instances) > 1:
+                # Check if they form a continuous sequence
+                diffs = np.diff(sorted_instances)
+                if not np.all(diffs == 1):
+                    return DicomStatus.GAP_INSTANCE_NUMBER
+        except (ValueError, TypeError):
+            # If conversion fails, we can't check for gaps
+            pass
 
     # --------------------------  Dtype (Bits) --------------------------
-    # 尝试从 meta 中取 'RescaleIntercept' / 'RescaleSlope'
-    # 如果压根不存在也不一定是错误
-    _, bits_status1 = meta[CommonTags.BITS_STORED]
-    _, bits_status2 = meta[CommonTags.BITS_ALLOCATED]
-    _, bits_status3 = meta[CommonTags.HIGH_BIT]
-    _, bits_status4 = meta[CommonTags.PIXEL_REPRESENTATION]
-
-    if (
-        (bits_status1 is None)
-        or (bits_status2 is None)
-        or (bits_status3 is None)
-        or (bits_status4 is None)
-    ):
+    dtype_tags = [
+        CommonTags.BitsStored,
+        CommonTags.BitsAllocated,
+        CommonTags.HighBit,
+        CommonTags.PixelRepresentation
+    ]
+    
+    # Check if any are missing
+    if any(meta.is_missing(tag) for tag in dtype_tags):
         return DicomStatus.MISSING_DTYPE
-
-    if not (
-        bits_status1 == "shared"
-        and bits_status2 == "shared"
-        and bits_status3 == "shared"
-        and bits_status4 == "shared"
-    ):
+        
+    # Check if any are non-shared
+    if any(not meta.is_shared(tag) for tag in dtype_tags):
         return DicomStatus.NON_UNIFORM_DTYPE
 
     # --------------------------  Pixel Spacing --------------------------
-    spacing_value, spacing_status = meta[CommonTags.PIXEL_SPACING]
-    if spacing_status is None:
+    if meta.is_missing(CommonTags.PixelSpacing):
         return DicomStatus.MISSING_SPACING
-    if spacing_status == "non_shared":
+    if not meta.is_shared(CommonTags.PixelSpacing):
         return DicomStatus.NON_UNIFORM_SPACING
 
     # --------------------------  Image Shape (Columns/Rows) --------------------------
-    col_value, col_status = meta[CommonTags.COLUMNS]
-    row_value, row_status = meta[CommonTags.ROWS]
-    # 若缺失
-    if col_status is None or row_status is None:
+    if meta.is_missing(CommonTags.Columns) or meta.is_missing(CommonTags.Rows):
         return DicomStatus.MISSING_SHAPE
-    # 若不一致(多帧不统一)
-    if col_status == "non_shared" or row_status == "non_shared":
+    if not meta.is_shared(CommonTags.Columns) or not meta.is_shared(CommonTags.Rows):
         return DicomStatus.NON_UNIFORM_SHAPE
 
     # --------------------------  Orientation --------------------------
-    ori_value, ori_status = meta[CommonTags.IMAGE_ORIENTATION_PATIENT]
-    if ori_status is None:
+    if meta.is_missing(CommonTags.ImageOrientationPatient):
         return DicomStatus.MISSING_ORIENTATION
-    if ori_status == "non_shared":
+    if not meta.is_shared(CommonTags.ImageOrientationPatient):
         return DicomStatus.NON_UNIFORM_ORIENTATION
 
-    # --------------------------  Location (Z 方向) --------------------------
-    # 需要 ImagePositionPatient 或 SliceLocation
-    pos_value, pos_status = meta[CommonTags.IMAGE_POSITION_PATIENT]
-    loc_value, loc_status = meta[CommonTags.SLICE_LOCATION]
+    # --------------------------  Location (Z direction) --------------------------
+    # Need either ImagePositionPatient or SliceLocation
+    has_position = not meta.is_missing(CommonTags.ImagePositionPatient)
+    has_location = not meta.is_missing(CommonTags.SliceLocation)
 
-    # 若两者均无，判定 MISSING_LOCATION
-    if pos_status is None and loc_status is None:
+    # If both are missing, mark as missing location
+    if not has_position and not has_location:
         return DicomStatus.MISSING_LOCATION
 
-    # 获取每张图像的 Z 值 (通常可由 ImagePositionPatient 或 SliceLocation 来推断)
-    # 这里示例从 DicomMeta 提供的接口 `_get_projection_location()` 中获取
-    z_locations = meta._get_projection_location()  # 返回长度与图像数相同的 Z 列表
-    # 按照 instance number 排序后，再判断 Z 是否符合期待
-    sort_idx = np.argsort(instance_numbers)
-    sorted_z = np.array(z_locations)[sort_idx]
+    # Get Z locations and check for issues
+    # For multi-slice datasets only
+    if meta.num_datasets > 1:
+        # Get Z locations from the DicomMeta helper method
+        z_locations = meta._get_projection_location()
+        
+        # Get the order of instance numbers
+        instance_numbers = meta.get_values(CommonTags.InstanceNumber)
+        try:
+            # Convert to integers and get sort order
+            int_instances = [int(num) if num is not None else float('inf') for num in instance_numbers]
+            sort_idx = np.argsort(int_instances)
+            
+            # Sort Z locations by instance number
+            sorted_z = np.array([z_locations[i] for i in sort_idx if i < len(z_locations)])
+            
+            # Check for direction changes
+            if len(sorted_z) > 1:
+                diffs_z = np.diff(sorted_z)
+                
+                # Check for direction changes (sign changes in differences)
+                if np.min(diffs_z) < 0 < np.max(diffs_z):
+                    return DicomStatus.REVERSED_LOCATION
+                
+                # Check for duplicate positions (zero differences)
+                if np.any(diffs_z == 0):
+                    return DicomStatus.DWELLING_LOCATION
+                
+                # Check for gaps in Z locations
+                avg_gap = calculate_average_z_gap(sorted_z)
+                if avg_gap > 0.0:
+                    # Calculate relative deviations from average gap
+                    ratio_diffs = np.abs(diffs_z - avg_gap) / (avg_gap + 1e-8)
+                    # If any gap is more than 50% different from average, mark as gap
+                    if np.any(ratio_diffs > 0.5):
+                        return DicomStatus.GAP_LOCATION
+        except (ValueError, TypeError):
+            # If conversion fails, we can't check for sequence issues
+            pass
 
-    # 检查是否出现"方向突变"或"反序部分"(这里只是示例，用 REVERSED_LOCATION 表示)
-    diffs_z = np.diff(sorted_z)
+    # --------------------------  Rescale Factor (Intercept/Slope) --------------------------
+    # These may not exist, so only check if they're present
+    has_intercept = not meta.is_missing(CommonTags.RescaleIntercept)
+    has_slope = not meta.is_missing(CommonTags.RescaleSlope)
+    
+    if has_intercept and has_slope:
+        # If present, check for consistency
+        if not meta.is_shared(CommonTags.RescaleIntercept) or not meta.is_shared(CommonTags.RescaleSlope):
+            return DicomStatus.NON_UNIFORM_RESCALE_FACTOR
 
-    # 若出现正负混合 => 方向突变
-    if np.min(diffs_z) < 0 < np.max(diffs_z):
-        return DicomStatus.REVERSED_LOCATION
-
-    # 检查是否有"停滞"(dwelling)，这里简单用"是否存在 0 差分"示例
-    if np.any(diffs_z == 0):
-        return DicomStatus.DWELLING_LOCATION
-
-    # 检查 gap
-    # 简化：若实测 diffs_z 中存在任意值> 1.5倍预期，就视为 GAP_LOCATION
-    avg_gap = calculate_average_z_gap(sorted_z)
-    if avg_gap == 0.0:
-        return DicomStatus.DWELLING_LOCATION
-
-    # 相对偏差
-    ratio_diffs = np.abs(diffs_z - avg_gap) / (avg_gap + 1e-8)
-    # 如果有某些差分比 avg_gap 大 50% (可自定义阈值)
-    if np.any(ratio_diffs > 0.5):
-        return DicomStatus.GAP_LOCATION
-
-    # --------------------------  Recale Factor (Intercept/Slope) --------------------------
-    # 尝试从 meta 中取 'RescaleIntercept' / 'RescaleSlope'
-    # 如果压根不存在也不一定是错误
-    intercept_val, intercept_status = meta[CommonTags.RESCALE_INTERCEPT]
-    slope_val, slope_status = meta[CommonTags.RESCALE_SLOPE]
-    if intercept_status == "non_shared" or slope_status == "non_shared":
-        return DicomStatus.NON_UNIFORM_RESCALE_FACTOR
-
-    # --------------------------  通关 --------------------------
-    # 若都没问题 => 说明 Z 方向近似均匀
+    # --------------------------  All checks passed --------------------------
     return DicomStatus.CONSISTENT 
