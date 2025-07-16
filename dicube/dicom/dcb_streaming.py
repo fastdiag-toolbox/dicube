@@ -7,18 +7,20 @@ Keeps files open and metadata cached for low-latency responses.
 
 import io
 import struct
-from typing import Optional, Dict, Any, List
+import warnings
+from typing import Dict, Any
 
-import numpy as np
 from pydicom import Dataset
 from pydicom.dataset import FileMetaDataset
 from pydicom.encaps import encapsulate
 from pydicom.uid import generate_uid
+import pydicom
 
 from ..storage.dcb_file import DcbFile
-from . import DicomMeta
-from ..core.pixel_header import PixelDataHeader
+from .dicom_io import save_dicom
 
+# 定义所需的最低PyDicom版本
+REQUIRED_PYDICOM_VERSION = "3.0.0"
 
 class DcbStreamingReader:
     """
@@ -37,7 +39,13 @@ class DcbStreamingReader:
         
         Args:
             dcb_file_path: dcb 文件路径
+            
+        Warnings:
+            UserWarning: 如果 PyDicom 版本低于 3.0.0，HTJ2K 解码可能无法正常工作
         """
+        # 检查 PyDicom 版本
+        self._check_pydicom_version()
+        
         self.file_path = dcb_file_path
         self.file_handle = None
         self.transfer_syntax_uid = None
@@ -59,6 +67,25 @@ class DcbStreamingReader:
         # 初始化
         self._open_and_parse()
     
+    def _check_pydicom_version(self):
+        """
+        检查 PyDicom 版本，如果不满足要求则发出警告
+        
+        Warnings:
+            UserWarning: 如果 PyDicom 版本低于 3.0.0
+        """
+        current_version = pydicom.__version__
+        if current_version < REQUIRED_PYDICOM_VERSION:
+            warnings.warn(
+                f"DcbStreamingReader 需要 PyDicom >= {REQUIRED_PYDICOM_VERSION} 以完全支持 HTJ2K 传输语法。"
+                f"当前 PyDicom 版本为 {current_version}，可能无法读取像素数据。"
+                f"写入功能不受影响，但其他应用读取时可能会出现问题。建议升级: pip install pydicom>={REQUIRED_PYDICOM_VERSION}，需要 python 3.10 或更高版本",
+                UserWarning
+            )
+            self._has_pydicom_htj2k_support = False
+        else:
+            self._has_pydicom_htj2k_support = True
+
     def _open_and_parse(self):
         """打开文件并解析所有元数据"""
         try:
@@ -185,7 +212,7 @@ class DcbStreamingReader:
         """将 Dataset 序列化为 DICOM 文件字节流"""
         # 使用 BytesIO 在内存中创建 DICOM 文件
         buffer = io.BytesIO()
-        ds.save_as(buffer, enforce_file_format=True)
+        save_dicom(ds, buffer)
         buffer.seek(0)
         return buffer.read()
     

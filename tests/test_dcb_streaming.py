@@ -5,9 +5,13 @@ Tests for DcbStreamingReader functionality
 import os
 import tempfile
 import pytest
+import pydicom
 
 import dicube
 from dicube.dicom.dcb_streaming import DcbStreamingReader
+
+# 检查PyDicom版本是否支持HTJ2K
+HAS_PYDICOM_HTJ2K_SUPPORT = pydicom.__version__ >= "3.0.0"
 
 
 @pytest.mark.skipif(
@@ -163,8 +167,8 @@ def test_dcb_streaming_reader_context_manager():
 
 
 @pytest.mark.skipif(
-    not os.path.exists("testdata/dicom/sample_150"),
-    reason="Sample DICOM data not available"
+    not os.path.exists("testdata/dicom/sample_150") or not HAS_PYDICOM_HTJ2K_SUPPORT,
+    reason="Sample DICOM data not available or PyDicom < 3.0.0 (HTJ2K not supported)"
 )
 def test_dcb_streaming_pixel_data_integrity():
     """
@@ -175,6 +179,8 @@ def test_dcb_streaming_pixel_data_integrity():
     2. Pixel data can be correctly read
     3. Pixel values after applying rescale slope and intercept match the original images
     4. Confirm that compressed format size is at least half the original size
+    
+    Note: This test requires PyDicom >= 3.0.0 for HTJ2K support
     """
     import pydicom
     import numpy as np

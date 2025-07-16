@@ -232,7 +232,6 @@ class DicomCubeImageIO:
     def save_to_dicom_folder(
         image: 'DicomCubeImage',
         output_dir: str,
-        **kwargs
     ) -> None:
         """保存DicomCubeImage为DICOM文件夹"""
         if image.dicom_meta is None:
@@ -244,5 +243,4 @@ class DicomCubeImageIO:
             dicom_meta=image.dicom_meta,
             pixel_header=image.pixel_header,
             output_dir=output_dir,
-            **kwargs
         ) 

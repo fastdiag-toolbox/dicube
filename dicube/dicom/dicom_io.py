@@ -92,26 +92,30 @@ def create_dicom_dataset(meta_dict: dict, pixel_header):
     return ds
 
 
-def save_dicom(
-    ds,
-    output_path: str,
-    use_j2k: bool = False,
-    lossless: bool = True,
-    **compress_kwargs,
-):
-    """Save DICOM file"""
-    if use_j2k:
-        if lossless:
-            ds.compress(transfer_syntax_uid=JPEG2000Lossless, **compress_kwargs)
-        else:
-            ds.compress(transfer_syntax_uid=JPEG2000, **compress_kwargs)
-
+def save_dicom(ds: Dataset, output_path: str):
+    """保存DICOM文件
+    
+    参数:
+        ds: DICOM数据集
+        output_path: 输出文件路径
+    """
+    
     sig = inspect.signature(Dataset.save_as)
-    if "enforce_file_format" in sig.parameters: # pydicom >= 3.0
+    if "enforce_file_format" in sig.parameters:  # pydicom >= 3.0
         ds.save_as(output_path, enforce_file_format=True)
     else:
+        # 确保使用有效的传输语法UID
+        if hasattr(ds, 'file_meta') and hasattr(ds.file_meta, 'TransferSyntaxUID'):
+            # 检查是否有效，如果无效则替换为标准的ExplicitVRLittleEndian
+            try:
+                from pydicom.uid import UID
+                uid = UID(ds.file_meta.TransferSyntaxUID)
+                if not hasattr(uid, 'is_little_endian'):
+                    ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
+            except (ValueError, AttributeError):
+                # 如果UID无效，使用标准的ExplicitVRLittleEndian
+                ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
         ds.save_as(output_path, write_like_original=False)
-
 
 def save_to_dicom_folder(
     raw_images: np.ndarray,
@@ -119,11 +123,16 @@ def save_to_dicom_folder(
     pixel_header,
     output_dir: str,
     filenames: Optional[List[str]] = None,
-    use_j2k: bool = False,
-    lossless: bool = True,
-    **compress_kwargs,
 ):
-    """Save image data as a DICOM directory"""
+    """将图像数据保存为DICOM文件夹
+    
+    参数:
+        raw_images: 原始图像数据，可以是2D或3D数组
+        dicom_meta: DICOM元数据
+        pixel_header: 像素头信息
+        output_dir: 输出目录
+        filenames: 自定义文件名列表，如果为None则使用默认名称
+    """
     prepare_output_dir(output_dir)
 
     if raw_images.ndim == 2:
@@ -141,4 +150,4 @@ def save_to_dicom_folder(
         output_path = os.path.join(
             output_dir, filenames[idx] if filenames else f"slice_{idx:04d}.dcm"
         )
-        save_dicom(ds, output_path, use_j2k, lossless, **compress_kwargs) 
+        save_dicom(ds, output_path)
