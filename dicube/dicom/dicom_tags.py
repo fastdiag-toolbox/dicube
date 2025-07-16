@@ -6,20 +6,22 @@ from typing import Any, Tuple, Union
 def parse_tag(
     input: Union[str, Tuple[Union[int, str], Union[int, str]], "Tag"]
 ) -> "Tag":
-    """
-    Parse a DICOM tag key from various input formats.
+    """Parse a DICOM tag key from various input formats.
 
     Args:
-        input: The input can be a string, a tuple of integers or strings, or a Tag object.
+        input (Union[str, Tuple[Union[int, str], Union[int, str]], Tag]): The input can be:
+            - A string in format "00100010" or "(0010,0010)"
+            - A tuple of integers or strings like (0x0010, 0x0020) or ("0010", "0020")
+            - A Tag object
 
     Returns:
-        A tuple of two integers representing the (group, element) of the DICOM tag.
+        Tag: A Tag object representing the DICOM tag.
 
     Raises:
         ValueError: If the input format is invalid or cannot be parsed.
     """
     if isinstance(input, Tag):
-        # 如果已经是 Tag 对象，尝试从 CommonTags 获取更多信息
+        # If already a Tag object, try to get more information from CommonTags
         try:
             return CommonTags.get_tag_by_tuple((input.group, input.element))
         except ValueError:
@@ -33,7 +35,7 @@ def parse_tag(
             group = int(group, 16)
         if isinstance(element, str):
             element = int(element, 16)
-        # 尝试从 CommonTags 获取
+        # Try to get from CommonTags
         try:
             return CommonTags.get_tag_by_tuple((group, element))
         except ValueError:
@@ -60,7 +62,7 @@ def parse_tag(
             else:
                 raise ValueError(f"Invalid input format: {input}")
 
-        # 尝试从 CommonTags 获取
+        # Try to get from CommonTags
         try:
             return CommonTags.get_tag_by_tuple((group, element))
         except ValueError:
@@ -70,11 +72,26 @@ def parse_tag(
 
 
 def format_tag(tag: "Tag") -> str:
-    """Format a Tag object into a string representation."""
+    """Format a Tag object into a DICOM standard string representation.
+
+    Args:
+        tag (Tag): The Tag object to format.
+
+    Returns:
+        str: A formatted string in format "(XXXX,XXXX)".
+    """
     return f"({tag.group:04X},{tag.element:04X})"
 
 
 def format_key(input: Any) -> str:
+    """Format a Tag or tuple into an 8-character hexadecimal key.
+
+    Args:
+        input (Any): A Tag object or (group, element) tuple.
+
+    Returns:
+        str: An 8-character hexadecimal key (e.g., "00100020").
+    """
     if isinstance(input, Tag):
         return f"{input.group:04X}{input.element:04X}"
     if isinstance(input, tuple):
@@ -82,25 +99,23 @@ def format_key(input: Any) -> str:
 
 
 class Tag:
-    """
-    A class representing a DICOM tag with group, element, name and VR.
+    """A class representing a DICOM tag with group, element, name and VR.
 
     Attributes:
-        group: Group number of the DICOM tag (e.g., 0x0010)
-        element: Element number of the DICOM tag (e.g., 0x0020)
-        name: Human-readable name of the tag (e.g., "Patient ID")
-        vr: Value Representation of the tag (e.g., "PN", "DA")
+        group (int): Group number of the DICOM tag (e.g., 0x0010).
+        element (int): Element number of the DICOM tag (e.g., 0x0020).
+        name (str): Human-readable name of the tag (e.g., "Patient ID").
+        vr (str): Value Representation of the tag (e.g., "PN", "DA").
     """
 
     def __init__(self, group: int, element: int, name: str = "", vr: str = ""):
-        """
-        Initialize a Tag instance.
+        """Initialize a Tag instance.
 
         Args:
-            group: Group number of the DICOM tag
-            element: Element number of the DICOM tag
-            name: Optional human-readable name of the tag
-            vr: Optional Value Representation of the tag
+            group (int): Group number of the DICOM tag.
+            element (int): Element number of the DICOM tag.
+            name (str, optional): Human-readable name of the tag. Defaults to "".
+            vr (str, optional): Value Representation of the tag. Defaults to "".
         """
         self.group = group
         self.element = element
@@ -108,32 +123,29 @@ class Tag:
         self.vr = vr
 
     def __repr__(self):
-        """
-        Get the string representation of the tag for debugging.
+        """Get the string representation of the tag for debugging.
 
         Returns:
-            str: Format: Tag((XXXX,XXXX), 'name', 'VR')
+            str: Format: Tag((XXXX,XXXX), 'name', 'VR').
         """
         return f"Tag({format_tag(self)}, '{self.name}', '{self.vr}')"
 
     def __str__(self):
-        """
-        Get the human-readable string representation of the tag.
+        """Get the human-readable string representation of the tag.
 
         Returns:
-            str: Format: name (XXXX,XXXX) [VR]
+            str: Format: name (XXXX,XXXX) [VR].
         """
         return f"{self.name} {format_tag(self)} [{self.vr}]"
 
     def __eq__(self, other):
-        """
-        Compare this tag with another tag or tuple.
+        """Compare this tag with another tag or tuple.
 
         Args:
-            other: Another Tag instance or (group, element) tuple
+            other (Union[Tag, Tuple[int, int]]): Another Tag instance or (group, element) tuple.
 
         Returns:
-            bool: True if the tags have the same group and element
+            bool: True if the tags have the same group and element.
         """
         if isinstance(other, Tag):
             return (self.group, self.element) == (other.group, other.element)
@@ -142,40 +154,36 @@ class Tag:
         return False
 
     def __hash__(self):
-        """
-        Get the hash value of the tag.
+        """Get the hash value of the tag.
 
         Returns:
-            int: Hash value based on group and element
+            int: Hash value based on group and element.
         """
         return hash((self.group, self.element))
 
     @property
     def key(self):
-        """
-        Get the tag key in 8-digit hex format.
+        """Get the tag key in 8-digit hex format.
 
         Returns:
-            str: Format: XXXXXXXX (e.g., '00100020')
+            str: Format: XXXXXXXX (e.g., '00100020').
         """
         return f"{self.group:04X}{self.element:04X}"
 
     @property
     def tag(self):
-        """
-        Get the tag as a tuple of group and element.
+        """Get the tag as a tuple of group and element.
 
         Returns:
-            tuple: Format: (group, element)
+            tuple: Format: (group, element).
         """
         return (self.group, self.element)
 
     def format_tag(self):
-        """
-        Format the tag in DICOM standard format.
+        """Format the tag in DICOM standard format.
 
         Returns:
-            str: Format: (XXXX,XXXX)
+            str: Format: (XXXX,XXXX).
         """
         return format_tag(self)
 
@@ -184,8 +192,7 @@ class Tag:
 
 
 class CommonTags:
-    """
-    Collection of commonly used DICOM tags as Tag instances.
+    """Collection of commonly used DICOM tags as Tag instances.
 
     Organized into categories:
     - Patient Information
@@ -266,42 +273,43 @@ class CommonTags:
 
     @classmethod
     def get_tag_by_name(cls, name: str) -> Tag:
-        """
-        Get a Tag instance by its name.
+        """Get a tag by its human-readable name.
 
         Args:
-            name: Name of the tag to find
+            name (str): The human-readable name of the tag.
 
         Returns:
-            Tag: The matching Tag instance
+            Tag: The tag with the specified name.
 
         Raises:
-            ValueError: If no tag with the given name is found
+            ValueError: If no tag with the specified name is found.
         """
-        for attr_name in dir(cls):
-            if attr_name.isupper():  # Only check uppercase attributes
-                attr = getattr(cls, attr_name)
-                if isinstance(attr, Tag) and attr.name == name:
-                    return attr
-        raise ValueError(f"No tag found with name: {name}")
+        name = name.strip()
+        for attr in dir(cls):
+            if attr.startswith("_"):  # Skip private attributes
+                continue
+            tag = getattr(cls, attr)
+            if isinstance(tag, Tag) and tag.name.lower() == name.lower():
+                return tag
+        raise ValueError(f"No tag found with name '{name}'")
 
     @classmethod
     def get_tag_by_tuple(cls, tag_tuple: Tuple[int, int]) -> Tag:
-        """
-        Get a Tag instance by its (group, element) tuple.
+        """Get a tag by its (group, element) tuple.
 
         Args:
-            tag_tuple: Tuple of (group, element) values
+            tag_tuple (Tuple[int, int]): The (group, element) tuple of the tag.
 
         Returns:
-            Tag: The matching Tag instance
+            Tag: The tag with the specified group and element.
 
         Raises:
-            ValueError: If no tag with the given tuple is found
+            ValueError: If no tag with the specified tuple is found.
         """
-        for attr_name in dir(cls):
-            if attr_name.isupper():  # Only check uppercase attributes
-                attr = getattr(cls, attr_name)
-                if isinstance(attr, Tag) and (attr.group, attr.element) == tag_tuple:
-                    return attr
-        raise ValueError(f"No tag found with tuple: {tag_tuple}") 
+        for attr in dir(cls):
+            if attr.startswith("_"):  # Skip private attributes
+                continue
+            tag = getattr(cls, attr)
+            if isinstance(tag, Tag) and (tag.group, tag.element) == tag_tuple:
+                return tag
+        raise ValueError(f"No tag found with tuple {tag_tuple}") 

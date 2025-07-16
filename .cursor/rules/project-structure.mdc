@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+# DiCube Project Structure
+
+DiCube is a Python library for efficient storage and processing of 3D medical images with complete DICOM metadata preservation.
+
+## Project Organization
+
+- **Core modules** in [dicube/core/](mdc:dicube/core/)
+  - [image.py](mdc:dicube/core/image.py): DicomCubeImage (main interface)
+  - [io.py](mdc:dicube/core/io.py): DicomCubeImageIO (file format I/O)
+  - [pixel_header.py](mdc:dicube/core/pixel_header.py): PixelDataHeader (image metadata)
+
+- **DICOM handling** in [dicube/dicom/](mdc:dicube/dicom/)
+  - [dicom_meta.py](mdc:dicube/dicom/dicom_meta.py): DicomMeta (metadata container)
+  - [dicom_status.py](mdc:dicube/dicom/dicom_status.py): DICOM consistency checking
+  - [dicom_tags.py](mdc:dicube/dicom/dicom_tags.py): DICOM tag definitions
+  - [dicom_io.py](mdc:dicube/dicom/dicom_io.py): DICOM file I/O
+  - [merge_utils.py](mdc:dicube/dicom/merge_utils.py): Metadata merging utilities
+
+- **Storage formats** in [dicube/storage/](mdc:dicube/storage/)
+  - [dcb_file.py](mdc:dicube/storage/dcb_file.py): DCB file format implementations
+  - [pixel_utils.py](mdc:dicube/storage/pixel_utils.py): Pixel processing utilities
+
+- **Compression codecs** in [dicube/codecs/](mdc:dicube/codecs/)
+  - [jph/](mdc:dicube/codecs/jph/): HTJ2K codec implementation
+
+- **Entry point**: [dicube/__init__.py](mdc:dicube/__init__.py)
+- **Exceptions**: [dicube/exceptions.py](mdc:dicube/exceptions.py)
+
+This library works alongside `spacetransformer` (for 3D spatial transformations) and `medmask` (for medical image segmentation).

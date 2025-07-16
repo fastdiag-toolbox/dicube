@@ -21,11 +21,17 @@ __all__ = [
 
 @runtime_checkable
 class ImageCodec(Protocol):
-    """Base interface that all image codecs must implement."""
+    """Base interface that all image codecs must implement.
+    
+    Attributes:
+        id (int): Unique numeric ID for the codec.
+        name (str): Codec name (e.g., "jph").
+        extensions (Tuple[str, ...]): Supported file extensions (e.g., (".j2k",)).
+    """
 
-    id: int  # unique numeric ID
-    name: str  # codec name (e.g. "jph")
-    extensions: Tuple[str, ...]  # supported file extensions (e.g. (".j2k",))
+    id: int
+    name: str
+    extensions: Tuple[str, ...]
     
     def encode(
         self, 
@@ -36,11 +42,11 @@ class ImageCodec(Protocol):
         """Encode numpy array to compressed bytes.
         
         Args:
-            image: Input image array
-            **kwargs: Codec-specific parameters
+            image (np.ndarray): Input image array.
+            **kwargs: Codec-specific parameters.
             
         Returns:
-            Compressed image data as bytes
+            bytes: Compressed image data.
         """
         ...
     
@@ -53,22 +59,28 @@ class ImageCodec(Protocol):
         """Decode compressed bytes to numpy array.
         
         Args:
-            data: Compressed image data
-            **kwargs: Codec-specific parameters
+            data (bytes): Compressed image data.
+            **kwargs: Codec-specific parameters.
             
         Returns:
-            Decoded image as numpy array
+            np.ndarray: Decoded image as numpy array.
         """
         ...
     
-
-    
     def is_available(self) -> bool:
-        """Check if codec is available and functional."""
+        """Check if codec is available and functional.
+        
+        Returns:
+            bool: True if the codec is available and operational.
+        """
         ...
     
     def get_version(self) -> str:
-        """Get codec version information."""
+        """Get codec version information.
+        
+        Returns:
+            str: Version information string.
+        """
         ...
 
 
@@ -80,7 +92,11 @@ _codec_registry: Dict[str, ImageCodec] = {}
 
 
 def register_codec(codec: ImageCodec) -> None:
-    """Register a codec in the global registry."""
+    """Register a codec in the global registry.
+    
+    Args:
+        codec (ImageCodec): The codec instance to register.
+    """
     _codec_registry[codec.name.lower()] = codec
 
 
@@ -88,13 +104,13 @@ def get_codec(name: str) -> ImageCodec:
     """Get codec by name (case-insensitive).
     
     Args:
-        name: Codec name (e.g. "jph")
+        name (str): Codec name (e.g., "jph").
         
     Returns:
-        Codec instance
+        ImageCodec: Codec instance.
         
     Raises:
-        ValueError: If codec not found
+        ValueError: If codec not found.
     """
     try:
         return _codec_registry[name.lower()]
@@ -104,7 +120,11 @@ def get_codec(name: str) -> ImageCodec:
 
 
 def list_codecs() -> list[str]:
-    """List all registered codec names."""
+    """List all registered codec names.
+    
+    Returns:
+        list[str]: List of registered codec names.
+    """
     return list(_codec_registry.keys())
 
 
@@ -112,19 +132,16 @@ def is_codec_available(name: str) -> bool:
     """Check if a codec is available.
     
     Args:
-        name: Codec name (e.g. "jph")
+        name (str): Codec name (e.g., "jph").
         
     Returns:
-        True if codec is available and functional, False otherwise
+        bool: True if codec is available and functional, False otherwise.
     """
     try:
         codec = get_codec(name)
         return codec.is_available()
     except ValueError:
         return False
-
-
-
 
 
 # Import and register concrete implementations

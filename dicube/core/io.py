@@ -21,13 +21,12 @@ from .pixel_header import PixelDataHeader
 
 
 class DicomCubeImageIO:
-    """
-    静态I/O工具类，负责DicomCubeImage的文件读写操作。
+    """Static I/O utility class responsible for DicomCubeImage file operations.
     
-    职责：
-    - 提供统一的文件I/O接口
-    - 自动检测文件格式
-    - 处理各种文件格式的转换
+    Responsibilities:
+    - Provides unified file I/O interface
+    - Automatically detects file formats
+    - Handles conversion between various file formats
     """
     
     @staticmethod
@@ -38,17 +37,20 @@ class DicomCubeImageIO:
         num_threads: int = 4,
         **kwargs
     ) -> None:
-        """
-        保存DicomCubeImage到文件。
+        """Save DicomCubeImage to a file.
         
         Args:
-            image: 要保存的DicomCubeImage对象
-            filename: 输出文件路径
-            file_type: 文件类型，"s"(速度优先), "a"(压缩优先), "l"(有损压缩)
-            num_threads: 并行编码线程数
-            **kwargs: 其他参数传递给底层writer
+            image (DicomCubeImage): The DicomCubeImage object to save.
+            filename (str): Output file path.
+            file_type (str): File type, "s" (speed priority), "a" (compression priority), 
+                             or "l" (lossy compression). Defaults to "s".
+            num_threads (int): Number of parallel encoding threads. Defaults to 4.
+            **kwargs: Additional parameters passed to the underlying writer.
+            
+        Raises:
+            ValueError: If the file_type is not supported.
         """
-        # 根据文件类型选择合适的writer
+        # Choose appropriate writer based on file type
         if file_type == "s":
             writer = DcbSFile(filename, mode="w")
         elif file_type == "a":
@@ -56,9 +58,9 @@ class DicomCubeImageIO:
         elif file_type == "l":
             writer = DcbLFile(filename, mode="w")
         else:
-            raise ValueError(f"不支持的文件类型: {file_type}，必须是 's', 'a', 'l' 之一")
+            raise ValueError(f"Unsupported file type: {file_type}, must be one of 's', 'a', 'l'")
         
-        # 写入文件
+        # Write to file
         writer.write(
             images=image.raw_image,
             pixel_header=image.pixel_header,
@@ -70,38 +72,37 @@ class DicomCubeImageIO:
     
     @staticmethod
     def load(filename: str, num_threads: int = 4, **kwargs) -> 'DicomCubeImage':
-        """
-        从文件加载DicomCubeImage。
+        """Load DicomCubeImage from a file.
         
         Args:
-            filename: 输入文件路径
-            num_threads: 并行解码线程数
-            **kwargs: 其他参数传递给底层reader
+            filename (str): Input file path.
+            num_threads (int): Number of parallel decoding threads. Defaults to 4.
+            **kwargs: Additional parameters passed to the underlying reader.
             
         Returns:
-            DicomCubeImage: 从文件加载的对象
+            DicomCubeImage: The loaded object from the file.
             
         Raises:
-            ValueError: 当文件格式不支持时
+            ValueError: When the file format is not supported.
         """
-        # 延迟导入避免循环依赖
+        # Delayed import to avoid circular dependency
         from .image import DicomCubeImage
         
-        # 读取文件头部判断格式
+        # Read file header to determine format
         header_size = struct.calcsize(DcbFile.HEADER_STRUCT)
         with open(filename, "rb") as f:
             header_data = f.read(header_size)
         magic = struct.unpack(DcbFile.HEADER_STRUCT, header_data)[0]
         
-        # 根据魔数选择合适的reader
+        # Choose appropriate reader based on magic number
         if magic == DcbAFile.MAGIC:
             reader = DcbAFile(filename, mode="r")
         elif magic == DcbSFile.MAGIC:
             reader = DcbSFile(filename, mode="r")
         else:
-            raise ValueError(f"不支持的文件格式，魔数: {magic}")
+            raise ValueError(f"Unsupported file format, magic number: {magic}")
         
-        # 读取文件内容
+        # Read file contents
         dicom_meta = reader.read_meta()
         space = reader.read_space()
         pixel_header = reader.read_pixel_header()
@@ -128,24 +129,24 @@ class DicomCubeImageIO:
         sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
         **kwargs
     ) -> 'DicomCubeImage':
-        """
-        从DICOM文件夹加载DicomCubeImage。
+        """Load DicomCubeImage from a DICOM folder.
         
         Args:
-            folder_path: DICOM文件夹路径
-            sort_method: DICOM文件排序方法
-            **kwargs: 其他参数
+            folder_path (str): Path to the DICOM folder.
+            sort_method (SortMethod): Method to sort DICOM files. 
+                                      Defaults to SortMethod.INSTANCE_NUMBER_ASC.
+            **kwargs: Additional parameters.
             
         Returns:
-            DicomCubeImage: 从DICOM文件夹创建的对象
+            DicomCubeImage: The object created from the DICOM folder.
             
         Raises:
-            ValueError: 当DICOM状态不支持时
+            ValueError: When the DICOM status is not supported.
         """
-        # 延迟导入避免循环依赖
+        # Delayed import to avoid circular dependency
         from .image import DicomCubeImage
         
-        # 读取DICOM文件夹
+        # Read DICOM folder
         meta, datasets = read_dicom_dir(folder_path, sort_method=sort_method)
         images = [d.pixel_array for d in datasets]
         status = get_dicom_status(meta)
@@ -157,7 +158,7 @@ class DicomCubeImageIO:
             DicomStatus.MISSING_SHAPE,
             DicomStatus.INCONSISTENT,
         ):
-            raise ValueError(f"不支持的DICOM状态: {status}")
+            raise ValueError(f"Unsupported DICOM status: {status}")
         
         if status in (
             DicomStatus.MISSING_SPACING,
@@ -169,7 +170,7 @@ class DicomCubeImageIO:
             DicomStatus.DWELLING_LOCATION,
             DicomStatus.GAP_LOCATION,
         ):
-            warnings.warn(f"DICOM状态: {status}，无法计算space信息")
+            warnings.warn(f"DICOM status: {status}, cannot calculate space information")
             space = None
         else:
             if get_space_from_DicomMeta is not None:
@@ -177,13 +178,13 @@ class DicomCubeImageIO:
             else:
                 space = None
         
-        # 获取rescale参数
+        # Get rescale parameters
         slope = meta.get(CommonTags.RESCALE_SLOPE, force_shared=True)[0]
         intercept = meta.get(CommonTags.RESCALE_INTERCEPT, force_shared=True)[0]
         wind_center = meta.get(CommonTags.WINDOW_CENTER, force_shared=True)
         wind_width = meta.get(CommonTags.WINDOW_WIDTH, force_shared=True)
         
-        # 创建pixel_header
+        # Create pixel_header
         pixel_header = PixelDataHeader(
             RESCALE_SLOPE=float(slope) if slope is not None else 1.0,
             RESCALE_INTERCEPT=float(intercept) if intercept is not None else 0.0,
@@ -197,31 +198,30 @@ class DicomCubeImageIO:
     
     @staticmethod
     def load_from_nifti(nii_path: str, **kwargs) -> 'DicomCubeImage':
-        """
-        从NIfTI文件加载DicomCubeImage。
+        """Load DicomCubeImage from a NIfTI file.
         
         Args:
-            nii_path: NIfTI文件路径
-            **kwargs: 其他参数
+            nii_path (str): Path to the NIfTI file.
+            **kwargs: Additional parameters.
             
         Returns:
-            DicomCubeImage: 从NIfTI文件创建的对象
+            DicomCubeImage: The object created from the NIfTI file.
             
         Raises:
-            ImportError: 当nibabel未安装时
+            ImportError: When nibabel is not installed.
         """
-        # 延迟导入避免循环依赖
+        # Delayed import to avoid circular dependency
         from .image import DicomCubeImage
         
         try:
             import nibabel as nib
         except ImportError:
-            raise ImportError("需要安装nibabel才能读取NIfTI文件")
+            raise ImportError("nibabel is required to read NIfTI files")
         
         nii = nib.load(nii_path)
         space = get_space_from_nifti(nii)
         
-        # 修复numpy数组警告
+        # Fix numpy array warning
         raw_image, header = derive_pixel_header_from_array(
             np.asarray(nii.dataobj, dtype=nii.dataobj.dtype)
         )
@@ -233,9 +233,14 @@ class DicomCubeImageIO:
         image: 'DicomCubeImage',
         output_dir: str,
     ) -> None:
-        """保存DicomCubeImage为DICOM文件夹"""
+        """Save DicomCubeImage as a DICOM folder.
+        
+        Args:
+            image (DicomCubeImage): The DicomCubeImage object to save.
+            output_dir (str): Output directory path.
+        """
         if image.dicom_meta is None:
-            warnings.warn("dicom_meta为None，使用默认值初始化")
+            warnings.warn("dicom_meta is None, initializing with default values")
             image.init_meta()
         
         save_to_dicom_folder(

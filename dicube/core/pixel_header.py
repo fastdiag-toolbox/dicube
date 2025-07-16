@@ -5,8 +5,7 @@ from typing import Dict, Optional
 
 @dataclass
 class PixelDataHeader:
-    """
-    Header class for storing pixel data information in medical images.
+    """Header class for storing pixel data information in medical images.
 
     Stores metadata including:
     - Rescale factors (slope/intercept)
@@ -16,15 +15,15 @@ class PixelDataHeader:
     - Additional metadata in EXTRAS
 
     Attributes:
-        RESCALE_SLOPE: Slope for linear transformation
-        RESCALE_INTERCEPT: Intercept for linear transformation
-        PIXEL_DTYPE: Pixel data type string (after convert to dcb file)
-        ORIGINAL_PIXEL_DTYPE: Original pixel data type string (before convert to dcb file)
-        WINDOW_CENTER: Optional window center value
-        WINDOW_WIDTH: Optional window width value
-        MAX_VAL: Optional maximum pixel value
-        MIN_VAL: Optional minimum pixel value
-        EXTRAS: Dictionary for additional metadata
+        RESCALE_SLOPE (float): Slope for linear transformation.
+        RESCALE_INTERCEPT (float): Intercept for linear transformation.
+        PIXEL_DTYPE (str): Pixel data type string (after convert to dcb file).
+        ORIGINAL_PIXEL_DTYPE (str): Original pixel data type string (before convert to dcb file).
+        WINDOW_CENTER (float, optional): Window center value for display.
+        WINDOW_WIDTH (float, optional): Window width value for display.
+        MAX_VAL (float, optional): Maximum pixel value.
+        MIN_VAL (float, optional): Minimum pixel value.
+        EXTRAS (Dict[str, any]): Dictionary for additional metadata.
     """
 
     RESCALE_SLOPE: float = 1.0
@@ -38,14 +37,13 @@ class PixelDataHeader:
     EXTRAS: Dict[str, any] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
-        """
-        Convert the header to a dictionary for serialization.
+        """Convert the header to a dictionary for serialization.
 
         Merges EXTRAS field into the main dictionary and removes
         the redundant EXTRAS key.
 
         Returns:
-            dict: Dictionary representation of the header
+            dict: Dictionary representation of the header.
         """
         data = asdict(self)
         data.update(self.EXTRAS)  # Merge EXTRAS into dictionary
@@ -54,14 +52,13 @@ class PixelDataHeader:
 
     @classmethod
     def from_dict(cls, d: dict):
-        """
-        Create a PixelDataHeader from a dictionary.
+        """Create a PixelDataHeader from a dictionary.
 
         Args:
-            d: Dictionary containing header data
+            d (dict): Dictionary containing header data.
 
         Returns:
-            PixelDataHeader: A new instance with values from the dictionary
+            PixelDataHeader: A new instance with values from the dictionary.
         """
         rescale_slope = d.get("RESCALE_SLOPE", 1.0)
         rescale_intercept = d.get("RESCALE_INTERCEPT", 0.0)
@@ -99,24 +96,22 @@ class PixelDataHeader:
         )
 
     def to_json(self) -> str:
-        """
-        Serialize the header to a JSON string.
+        """Serialize the header to a JSON string.
 
         Returns:
-            str: JSON string representation of the header
+            str: JSON string representation of the header.
         """
         return json.dumps(self.to_dict())
 
     @classmethod
     def from_json(cls, json_str: str):
-        """
-        Create a PixelDataHeader from a JSON string.
+        """Create a PixelDataHeader from a JSON string.
 
         Args:
-            json_str: JSON string containing header data
+            json_str (str): JSON string containing header data.
 
         Returns:
-            PixelDataHeader: A new instance created from the JSON data
+            PixelDataHeader: A new instance created from the JSON data.
         """
         obj_dict = json.loads(json_str)
         return cls.from_dict(obj_dict) 

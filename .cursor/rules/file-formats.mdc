@@ -1,0 +1,26 @@
+---
+description: Information about DiCube file formats and specifications
+---
+# DiCube File Formats
+
+DiCube defines three file format specifications:
+
+## Currently Implemented
+
+### .dcbs (Speed Format)
+- **Magic**: `DCMCUBES`
+- **Target**: I/O speed suitable for deep learning training with high compression ratio
+- **Codec**: High Throughput JPEG 2000 (HTJ2K)
+- **Implementation**: [storage/dcb_file.py](mdc:dicube/storage/dcb_file.py) and [codecs/jph/](mdc:dicube/codecs/jph/)
+
+## Placeholder Formats (Future Implementation)
+
+### .dcba (Archive Format) 
+- **Magic**: `DCMCUBEA`
+- **Target**: 20% better compression ratio than dcbs
+- **Use case**: Long-term storage and archiving
+
+### .dcbl (Lossy Format)
+- **Magic**: `DCMCUBEL`
+- **Target**: 60%+ compression ratio with imperceptible quality loss
+- **Use case**: High-compression scenarios where minor quality trade-offs are acceptable

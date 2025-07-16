@@ -1,3 +1,25 @@
+"""DiCube: Python library for efficient storage and processing of 3D medical images.
+
+DiCube provides functionality for working with DICOM image data while preserving
+complete metadata. It offers efficient storage formats, image processing capabilities,
+and interoperability with various medical image formats.
+
+Main functionality:
+- Load/save 3D medical images with complete DICOM metadata
+- Efficient binary storage format with multiple compression options
+- Spatial transformation and orientation handling
+- Conversion between different medical image formats
+
+Example:
+    >>> import dicube
+    >>> # Load from DICOM folder
+    >>> image = dicube.load_from_dicom_folder("path/to/dicom_folder")
+    >>> # Save to DCB file
+    >>> dicube.save(image, "output.dcb")
+    >>> # Access the data
+    >>> pixel_data = image.get_fdata()
+"""
+
 from .core.image import DicomCubeImage
 from .core.io import DicomCubeImageIO
 from .dicom import (
@@ -14,9 +36,18 @@ try:
 except ImportError:
     __version__ = "0.1.0"
 
-# 顶层便利方法
+# Top-level convenience methods
 def load(filename: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:
-    """从文件加载DicomCubeImage"""
+    """Load a DicomCubeImage from a file.
+    
+    Args:
+        filename (str): Path to the input file.
+        num_threads (int): Number of parallel decoding threads. Defaults to 4.
+        **kwargs: Additional parameters passed to the underlying reader.
+    
+    Returns:
+        DicomCubeImage: The loaded image object.
+    """
     return DicomCubeImageIO.load(filename, num_threads, **kwargs)
 
 
@@ -27,7 +58,16 @@ def save(
     num_threads: int = 4,
     **kwargs
 ) -> None:
-    """保存DicomCubeImage到文件"""
+    """Save a DicomCubeImage to a file.
+    
+    Args:
+        image (DicomCubeImage): The image object to save.
+        filename (str): Output file path.
+        file_type (str): File type, "s" (speed priority), "a" (compression priority), 
+                        or "l" (lossy compression). Defaults to "s".
+        num_threads (int): Number of parallel encoding threads. Defaults to 4.
+        **kwargs: Additional parameters passed to the underlying writer.
+    """
     return DicomCubeImageIO.save(image, filename, file_type, num_threads, **kwargs)
 
 
@@ -36,12 +76,30 @@ def load_from_dicom_folder(
     sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
     **kwargs
 ) -> DicomCubeImage:
-    """从DICOM文件夹加载DicomCubeImage"""
+    """Load a DicomCubeImage from a DICOM folder.
+    
+    Args:
+        folder_path (str): Path to the DICOM folder.
+        sort_method (SortMethod): Method to sort DICOM files. 
+                                 Defaults to SortMethod.INSTANCE_NUMBER_ASC.
+        **kwargs: Additional parameters.
+    
+    Returns:
+        DicomCubeImage: The loaded image object.
+    """
     return DicomCubeImageIO.load_from_dicom_folder(folder_path, sort_method, **kwargs)
 
 
 def load_from_nifti(nii_path: str, **kwargs) -> DicomCubeImage:
-    """从NIfTI文件加载DicomCubeImage"""
+    """Load a DicomCubeImage from a NIfTI file.
+    
+    Args:
+        nii_path (str): Path to the NIfTI file.
+        **kwargs: Additional parameters.
+    
+    Returns:
+        DicomCubeImage: The loaded image object.
+    """
     return DicomCubeImageIO.load_from_nifti(nii_path, **kwargs)
 
 
@@ -50,8 +108,14 @@ def save_to_dicom_folder(
     output_dir: str,
     **kwargs
 ) -> None:
-    """保存DicomCubeImage为DICOM文件夹"""
-    return DicomCubeImageIO.save_to_dicom_folder(image, output_dir, **kwargs)
+    """Save a DicomCubeImage as a DICOM folder.
+    
+    Args:
+        image (DicomCubeImage): The image object to save.
+        output_dir (str): Output directory path.
+        **kwargs: Additional parameters.
+    """
+    return DicomCubeImageIO.save_to_dicom_folder(image, output_dir)
 
 
 __all__ = [
@@ -62,12 +126,12 @@ __all__ = [
     "get_dicom_status",
     "CommonTags",
     "SortMethod",
-    # 顶层便利方法
+    # Top-level convenience methods
     "load",
     "save",
     "load_from_dicom_folder",
     "load_from_nifti",
     "save_to_dicom_folder",
-    # IO类（如果需要直接使用）
+    # IO class (for direct use if needed)
     "DicomCubeImageIO",
 ] 

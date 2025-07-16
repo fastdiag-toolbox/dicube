@@ -11,7 +11,13 @@ from .ojph_decode_complete import decode_image
 
 
 class JphCodec:
-    """JPEG 2000 codec (OpenJPH) implementing ImageCodec interface."""
+    """JPEG 2000 codec (OpenJPH) implementing ImageCodec interface.
+    
+    Attributes:
+        id (int): Unique numeric ID for the codec.
+        name (str): Codec name ("jph").
+        extensions (Tuple[str, ...]): Supported file extensions (.j2k, .j2c, .jp2).
+    """
     
     id: int = 2
     name: str = "jph"
@@ -33,24 +39,30 @@ class JphCodec:
         """Encode numpy array to JPEG 2000 bytes.
         
         Args:
-            image: Input image array
-            reversible: Whether to use reversible transform (default: True)
-            num_decompositions: Number of wavelet decompositions (default: 5)
-            block_size: Code block size as (width, height) (default: (64, 64))
-            precinct_size: Precinct size for each level as (width, height) (default: None)
-            progression_order: Progression order, one of LRCP, RLCP, RPCL, PCRL, CPRL (default: RPCL)
-            color_transform: Whether to use color transform (default: False)
-            profile: Profile to use, one of None, IMF, BROADCAST (default: None)
-            **kwargs: Additional parameters (ignored for compatibility)
+            image (np.ndarray): Input image array.
+            reversible (bool): Whether to use reversible transform. Defaults to True.
+            num_decompositions (int): Number of wavelet decompositions. Defaults to 5.
+            block_size (tuple): Code block size as (width, height). Defaults to (64, 64).
+            precinct_size (tuple, optional): Precinct size for each level as (width, height).
+                Defaults to None.
+            progression_order (str): Progression order, one of LRCP, RLCP, RPCL, PCRL, CPRL.
+                Defaults to "RPCL".
+            color_transform (bool): Whether to use color transform. Defaults to False.
+            profile (str, optional): Profile to use, one of None, IMF, BROADCAST.
+                Defaults to None.
+            **kwargs: Additional parameters (ignored for compatibility).
             
         Returns:
-            Compressed JPEG 2000 data as bytes
+            bytes: Compressed JPEG 2000 data.
+            
+        Raises:
+            ValueError: If the image dimensions or block size are invalid.
         """
-        # 参数验证
+        # Parameter validation
         if len(image.shape) not in (2, 3):
             raise ValueError("Image must be 2D or 3D array")
 
-        # 验证代码块大小
+        # Validate code block size
         if not all(
             size > 0 and size <= 64 and (size & (size - 1)) == 0 for size in block_size
         ):
@@ -58,11 +70,11 @@ class JphCodec:
                 "Code block dimensions must be powers of 2 and not larger than 64"
             )
 
-        # 确保数据是连续的
+        # Ensure data is contiguous
         if not image.flags["C_CONTIGUOUS"]:
             image = np.ascontiguousarray(image)
 
-        # 调用C++实现
+        # Call C++ implementation
         return encode_image(
             image,
             reversible=reversible,
@@ -73,6 +85,25 @@ class JphCodec:
             color_transform=color_transform,
             profile="" if profile is None else profile,
         )
+    
+    def encode_lossless(
+        self,
+        image: np.ndarray,
+        /,
+        **kwargs: Any
+    ) -> bytes:
+        """Encode numpy array to lossless JPEG 2000 bytes.
+        
+        This is a convenience method that calls encode() with reversible=True.
+        
+        Args:
+            image (np.ndarray): Input image array.
+            **kwargs: Additional parameters passed to encode().
+            
+        Returns:
+            bytes: Compressed JPEG 2000 data.
+        """
+        return self.encode(image, reversible=True, **kwargs)
     
     def decode(
         self, 
@@ -85,20 +116,25 @@ class JphCodec:
         """Decode JPEG 2000 bytes to numpy array.
         
         Args:
-            data: Compressed JPEG 2000 data
-            level: Resolution level to decode at (0 = full resolution) (default: 0)
-            resilient: Whether to enable resilient decoding (default: False)
-            **kwargs: Additional parameters (ignored for compatibility)
+            data (bytes): Compressed JPEG 2000 data.
+            level (int): Resolution level to decode at (0 = full resolution).
+                Defaults to 0.
+            resilient (bool): Whether to enable resilient decoding. Defaults to False.
+            **kwargs: Additional parameters (ignored for compatibility).
             
         Returns:
-            Decoded image as numpy array
+            np.ndarray: Decoded image as numpy array.
         """
-        # 使用C++实现
+        # Use C++ implementation
         return decode_image(data, level=level, resilient=resilient)
 
     
     def is_available(self) -> bool:
-        """Check if JPEG 2000 codec is available and functional."""
+        """Check if JPEG 2000 codec is available and functional.
+        
+        Returns:
+            bool: True if the codec is available and operational.
+        """
         try:
             # Test with a small image
             test_image = np.ones((10, 10), dtype=np.uint8)
@@ -109,8 +145,17 @@ class JphCodec:
             return False
     
     def get_version(self) -> str:
-        """Get JPEG 2000 codec version."""
+        """Get JPEG 2000 codec version.
+        
+        Returns:
+            str: Version information string.
+        """
         return "OpenJPH"  # TODO: Get actual version from OpenJPH
     
     def __repr__(self) -> str:
+        """Get string representation of the codec.
+        
+        Returns:
+            str: String representation.
+        """
         return f"<{self.__class__.__name__} id={self.id} name='{self.name}' version='{self.get_version()}'>" 

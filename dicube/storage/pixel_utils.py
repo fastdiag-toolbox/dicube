@@ -8,8 +8,7 @@ from ..core.pixel_header import PixelDataHeader
 def derive_pixel_header_from_array(
     image: np.ndarray, preferred_dtype=np.uint16
 ) -> Tuple[np.ndarray, PixelDataHeader]:
-    """
-    Derive pixel data header information from input numpy array.
+    """Derive pixel data header information from input numpy array.
 
     Process different data types in different ways:
     - For unsigned integers (uint8/16/32): use raw data directly
@@ -17,15 +16,17 @@ def derive_pixel_header_from_array(
     - For floating point (float16/32/64): normalize to specified unsigned integer range
 
     Args:
-        image: Input image array
-        preferred_dtype: Preferred output data type, defaults to np.uint16
+        image (np.ndarray): Input image array.
+        preferred_dtype (np.dtype): Preferred output data type. Defaults to np.uint16.
 
     Returns:
-        tuple: (Converted image array, PixelDataHeader object)
+        Tuple[np.ndarray, PixelDataHeader]: A tuple containing:
+            - The converted image array
+            - A PixelDataHeader object with appropriate metadata
 
     Raises:
-        ValueError: When preferred_dtype is not supported
-        NotImplementedError: When input array dtype is not supported
+        ValueError: When preferred_dtype is not supported.
+        NotImplementedError: When input array dtype is not supported.
     """
     dtype = str(image.dtype)
     if image.dtype in (np.uint16, np.uint8, np.uint32):
@@ -106,22 +107,22 @@ def derive_pixel_header_from_array(
 def get_float_data(
     raw_image: np.ndarray, pixel_header: PixelDataHeader, dtype="float32"
 ) -> np.ndarray:
-    """
-    Get image data as floating point array with slope/intercept applied.
+    """Get image data as floating point array with slope/intercept applied.
 
     Inspired by NIfTI's get_fdata method, this converts the raw image data
     to floating point format and applies the rescale slope and intercept.
 
     Args:
-        raw_image: Raw image data array
-        pixel_header: Pixel data header containing rescale information
-        dtype: Output data type, must be one of: float16, float32, float64
+        raw_image (np.ndarray): Raw image data array.
+        pixel_header (PixelDataHeader): Pixel data header containing rescale information.
+        dtype (str): Output data type, must be one of: float16, float32, float64. 
+            Defaults to "float32".
 
     Returns:
-        np.ndarray: Floating point image data with rescale factors applied
+        np.ndarray: Floating point image data with rescale factors applied.
 
     Raises:
-        AssertionError: If dtype is not one of the allowed float types
+        AssertionError: If dtype is not one of the allowed float types.
     """
     assert dtype in (
         "float16",

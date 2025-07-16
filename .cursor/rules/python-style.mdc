@@ -1,0 +1,46 @@
+---
+globs: *.py
+---
+# Python Code Style Guide
+
+When writing or modifying Python code in this project, follow these guidelines:
+
+1. Use **type annotations** wherever possible for improved code clarity and IDE support.
+2. Import order should be:
+   - Standard library imports
+   - Third-party imports
+   - Local imports (from dicube)
+3. Use **Google style docstrings** for all functions, classes, and modules:
+
+```python
+def function_example(param1, param2):
+    """Short description of function purpose.
+    
+    Args:
+        param1 (type): Description of parameter.
+        param2 (type): Description of parameter.
+        
+    Returns:
+        type: Description of return value.
+        
+    Raises:
+        ExceptionType: When and why this exception is raised.
+        
+    Example:
+        >>> result = function_example(1, 2)
+        >>> print(result)
+        3
+    """
+```
+
+4. Keep functions **focused** and **single-purpose**.
+5. For error handling:
+   - Use specific exceptions from [dicube/exceptions.py](mdc:dicube/exceptions.py)
+   - Validate input parameters early
+   - Add clear error messages
+6. For complex operations, add comments explaining the algorithm or approach.
+7. Use constants for magic values and define them at the module level.
+8. Performance matters - use numpy vectorized operations where possible.
+9. Method naming follows standard Python conventions:
+   - Methods that modify state: `set_`, `update_`, etc.
+   - Methods that return new objects without modifying state: `get_`, `compute_`, etc.
