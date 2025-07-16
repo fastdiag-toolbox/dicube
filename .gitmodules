@@ -3,4 +3,4 @@
 	url = https://github.com/aous72/OpenJPH.git
 [submodule "testdata"]
 	path = testdata
-	url = ./testdata
+	url = git@github.com:fastdiag-toolbox/dicube-testdata.git
