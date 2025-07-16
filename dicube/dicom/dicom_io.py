@@ -1,5 +1,6 @@
 import os
 import warnings
+import inspect
 from typing import List, Optional
 
 import numpy as np
@@ -105,7 +106,11 @@ def save_dicom(
         else:
             ds.compress(transfer_syntax_uid=JPEG2000, **compress_kwargs)
 
-    ds.save_as(output_path, enforce_file_format=True)
+    sig = inspect.signature(Dataset.save_as)
+    if "enforce_file_format" in sig.parameters: # pydicom >= 3.0
+        ds.save_as(output_path, enforce_file_format=True)
+    else:
+        ds.save_as(output_path, write_like_original=False)
 
 
 def save_to_dicom_folder(
