@@ -114,7 +114,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
         filenames = meta.filenames
     else:
         # If filenames are not stored, generate default filenames
-        filenames = [f"Dataset_{i}" for i in range(meta.num_datasets)]
+        filenames = [f"Dataset_{i}" for i in range(meta.slice_count)]
 
     # Define priority tags for ordering
     priority_shared_tags = [
@@ -204,7 +204,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
 
             # Collect values for each dataset
             values_rows = []
-            for idx in range(meta.num_datasets):
+            for idx in range(meta.slice_count):
                 row = {
                     f"({tag.group:04X},{tag.element:04X})": non_shared_data[tag.key]["Values"][idx]
                     for tag in non_shared_tags
@@ -237,7 +237,7 @@ class DicomMeta:
     Attributes:
         _merged_data (Dict[str, Dict[str, Any]]): The merged metadata from all datasets.
         filenames (List[str], optional): List of filenames for the datasets.
-        num_datasets (int): Number of datasets represented.
+        slice_count (int): Number of datasets represented.
     """
 
     def __init__(
@@ -256,15 +256,15 @@ class DicomMeta:
         # Calculate number of datasets from the first non-shared field
         for tag_entry in merged_data.values():
             if tag_entry.get("shared") is False and "Value" in tag_entry:
-                self.num_datasets = len(tag_entry["Value"])
+                self.slice_count = len(tag_entry["Value"])
                 break
         else:
             # If no non-shared fields are found, default to 1
             if filenames is not None:
-                self.num_datasets = len(filenames)
+                self.slice_count = len(filenames)
             else:
                 warnings.warn("No filenames provided, defaulting to 1 dataset")
-                self.num_datasets = 1
+                self.slice_count = 1
 
     @classmethod
     def from_datasets(
@@ -300,7 +300,7 @@ class DicomMeta:
         Returns:
             str: JSON string representation of the DicomMeta.
         """
-        data = {"_merged_data": self._merged_data, "num_datasets": self.num_datasets}
+        data = {"_merged_data": self._merged_data, "slice_count": self.slice_count}
         return json.dumps(data)
 
     @classmethod
@@ -336,12 +336,12 @@ class DicomMeta:
         # Get tag entry
         tag_entry = self._merged_data.get(tag_key)
         if tag_entry is None or "Value" not in tag_entry:
-            return [None] * self.num_datasets
+            return [None] * self.slice_count
             
         # Return values based on shared status
         if tag_entry.get("shared", False):
             # For shared tags, return the same value for all datasets
-            return [tag_entry["Value"]] * self.num_datasets
+            return [tag_entry["Value"]] * self.slice_count
         else:
             # For non-shared tags, return the list of values
             return tag_entry["Value"]
@@ -511,9 +511,9 @@ class DicomMeta:
         Raises:
             ValueError: If the number of values doesn't match the number of datasets
         """
-        if len(values) != self.num_datasets:
+        if len(values) != self.slice_count:
             raise ValueError(
-                f"Number of values ({len(values)}) does not match number of datasets ({self.num_datasets})"
+                f"Number of values ({len(values)}) does not match number of datasets ({self.slice_count})"
             )
 
         tag = Tag(tag_input)
@@ -564,7 +564,7 @@ class DicomMeta:
         if sort_method == SortMethod.INSTANCE_NUMBER_ASC:
             # Get instance numbers
             instance_numbers = self.get_values(CommonTags.InstanceNumber)
-            indices = list(range(self.num_datasets))
+            indices = list(range(self.slice_count))
             # Convert to integers for sorting
             int_values = [safe_int(v) for v in instance_numbers]
             # Sort based on instance numbers
@@ -575,7 +575,7 @@ class DicomMeta:
         elif sort_method == SortMethod.INSTANCE_NUMBER_DESC:
             # Get instance numbers
             instance_numbers = self.get_values(CommonTags.InstanceNumber)
-            indices = list(range(self.num_datasets))
+            indices = list(range(self.slice_count))
             # Convert to integers for sorting
             int_values = [safe_int(v) for v in instance_numbers]
             # Sort based on instance numbers (reverse)
@@ -590,7 +590,7 @@ class DicomMeta:
         elif sort_method in (SortMethod.POSITION_RIGHT_HAND, SortMethod.POSITION_LEFT_HAND):
             # Calculate projection location along normal vector
             projection_locations = _get_projection_location(self)
-            indices = list(range(self.num_datasets))
+            indices = list(range(self.slice_count))
             # Sort based on projection locations
             if sort_method == SortMethod.POSITION_RIGHT_HAND:
                 sorted_indices = [

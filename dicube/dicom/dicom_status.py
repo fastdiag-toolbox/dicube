@@ -138,7 +138,7 @@ def get_dicom_status(meta) -> DicomStatus:
     instance_numbers = meta.get_values(CommonTags.InstanceNumber)
     
     # Check for single image
-    if meta.num_datasets == 1:
+    if meta.slice_count == 1:
         # Single image is fine, continue to next check
         pass
     else:
@@ -207,7 +207,7 @@ def get_dicom_status(meta) -> DicomStatus:
 
     # Get Z locations and check for issues
     # For multi-slice datasets only
-    if meta.num_datasets > 1:
+    if meta.slice_count > 1:
         # Get Z locations from the DicomMeta helper method
         z_locations = meta._get_projection_location()
         

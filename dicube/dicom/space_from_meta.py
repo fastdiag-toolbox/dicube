@@ -25,7 +25,7 @@ def get_space_from_DicomMeta(meta, axis_order="xyz"):
         ValueError: If required DICOM tags are missing or invalid
     """
 
-    num_images = meta.num_datasets
+    num_images = meta.slice_count
     status = get_dicom_status(meta)
     if status not in (DicomStatus.CONSISTENT, DicomStatus.NON_UNIFORM_RESCALE_FACTOR):
         return None

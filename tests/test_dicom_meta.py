@@ -8,7 +8,7 @@ def test_dicommeta_from_datasets(dicom_meta):
     """
     Test that DicomMeta can be correctly instantiated from DICOM datasets.
     """
-    assert dicom_meta.num_datasets > 0, "No datasets were loaded."
+    assert dicom_meta.slice_count > 0, "No datasets were loaded."
     assert isinstance(dicom_meta, DicomMeta), "Object is not of type DicomMeta."
 
 
@@ -31,7 +31,7 @@ def test_get_nonshared_metadata(dicom_meta):
     instance_numbers = dicom_meta.get_values(CommonTags.InstanceNumber)
     assert isinstance(instance_numbers, list), "Instance numbers should be a list."
     assert (
-        len(instance_numbers) == dicom_meta.num_datasets
+        len(instance_numbers) == dicom_meta.slice_count
     ), "Mismatch in number of instance numbers."
 
 
@@ -65,7 +65,7 @@ def test_projection_location(dicom_meta):
         projection_locations, list
     ), "Projection locations should be a list."
     assert (
-        len(projection_locations) == dicom_meta.num_datasets
+        len(projection_locations) == dicom_meta.slice_count
     ), "Mismatch in number of projection locations."
 
 
@@ -103,7 +103,7 @@ def test_dicom_meta_basic_operations(dummy_dicom_meta):
     
     # Get values as list
     patient_name_list = dummy_dicom_meta.get_values(CommonTags.PatientName)
-    assert patient_name_list == ["TEST^PATIENT"]*dummy_dicom_meta.num_datasets, "Unexpected patient name list."
+    assert patient_name_list == ["TEST^PATIENT"]*dummy_dicom_meta.slice_count, "Unexpected patient name list."
 
 
 def test_is_missing(dummy_dicom_meta):

@@ -62,7 +62,7 @@ def test_non_uniform_series_uid(normal_meta):
     触发 NON_UNIFORM_SERIES_UID
     """
     meta_copy = copy.deepcopy(normal_meta)
-    lens = meta_copy.num_datasets
+    lens = meta_copy.slice_count
     # 将 SERIES_INSTANCE_UID 设置为一个列表(多个UID), 即 non_shared
     meta_copy.set_nonshared_item(
         CommonTags.SeriesInstanceUID, ["1.2.3", "4.5.6"] + [""] * (lens - 2)
@@ -88,8 +88,8 @@ def test_duplicate_instance_numbers(normal_meta):
     meta_copy = copy.deepcopy(normal_meta)
     # 假设原本有 n 张图像，就模拟让其中的 InstanceNumber 全部重复
     # 例如本来是 [1, 2, 3, ..., n] => 全部设置为 [1, 1, 1, ..., 1]
-    num_datasets = meta_copy.num_datasets
-    meta_copy.set_nonshared_item(CommonTags.InstanceNumber, [1] * num_datasets)
+    slice_count = meta_copy.slice_count
+    meta_copy.set_nonshared_item(CommonTags.InstanceNumber, [1] * slice_count)
     status = get_dicom_status(meta_copy)
     assert status == DicomStatus.DUPLICATE_INSTANCE_NUMBERS
 
@@ -101,8 +101,8 @@ def test_gap_instance_number(normal_meta):
     meta_copy = copy.deepcopy(normal_meta)
     # 将它们改成 [1,2,3,5,6,...] 人为制造一个 gap
     # 为简单起见，我们只改前4个值: [1,2,4,5], 剩下的按原值填充也可
-    num_datasets = meta_copy.num_datasets
-    original = list(range(1, num_datasets + 1))
+    slice_count = meta_copy.slice_count
+    original = list(range(1, slice_count + 1))
     for i in range(4, len(original)):
         original[i] += 1
     meta_copy.set_nonshared_item(CommonTags.InstanceNumber, original)
@@ -138,7 +138,7 @@ def test_non_uniform_spacing(normal_meta):
     meta_copy = copy.deepcopy(normal_meta)
     # 模拟不同帧像素间距不一致
     # 比如前半帧 [0.8, 0.8], 后半帧 [1.0, 1.0]
-    num = meta_copy.num_datasets
+    num = meta_copy.slice_count
     half = num // 2
     values = []
     for i in range(num):
@@ -187,8 +187,8 @@ def test_non_uniform_shape(normal_meta):
     initial_status = get_dicom_status(normal_meta)
     
     meta_copy = copy.deepcopy(normal_meta)
-    # 假设 num_datasets 帧中，一半列数是 512，一半是 256
-    num = meta_copy.num_datasets
+    # 假设 slice_count 帧中，一半列数是 512，一半是 256
+    num = meta_copy.slice_count
     half = num // 2
     columns_list = []
     for i in range(num):
@@ -234,7 +234,7 @@ def test_non_uniform_orientation(normal_meta):
     meta_copy = copy.deepcopy(normal_meta)
     # 第一帧: [1,0,0, 0,1,0] ; 第二帧: [1,0,0, 0,0,-1], ...
     # 只要保证有差异即可
-    num = meta_copy.num_datasets
+    num = meta_copy.slice_count
     if num < 2:
         pytest.skip("需要至少2帧才能测试非统一方向")
     orientation_list = []
@@ -282,7 +282,7 @@ def test_non_uniform_dtype(normal_meta):
     initial_status = get_dicom_status(normal_meta)
     
     meta_copy = copy.deepcopy(normal_meta)
-    num = meta_copy.num_datasets
+    num = meta_copy.slice_count
     half = num // 2
     bits_stored_list = []
     bits_allocated_list = []
@@ -345,7 +345,7 @@ def test_reversed_location(normal_meta):
     meta_copy = copy.deepcopy(normal_meta)
 
     def mock_locations():
-        num = meta_copy.num_datasets
+        num = meta_copy.slice_count
         base = list(range(0, num))
         if num > 5:
             base[5] = 3
@@ -374,7 +374,7 @@ def test_dwelling_location(normal_meta):
     # 假设有5帧 => [1,2,3,3,4]
     # 如果帧数更大，可自行repeat这种停滞
     def mock_locations():
-        num = meta_copy.num_datasets
+        num = meta_copy.slice_count
         base = list(range(1, num + 1))
         if num >= 4:
             base[2] = base[1]  # 人为制造重复
@@ -403,7 +403,7 @@ def test_gap_location(normal_meta):
 
     # 比如 [1,2,3,5,6] => diffs里出现超过平均* 1.5倍的跳跃
     def mock_locations():
-        num = meta_copy.num_datasets
+        num = meta_copy.slice_count
         base = list(range(1, num + 1))
         for i in range(4, num):
             base[i] += 1
@@ -429,7 +429,7 @@ def test_non_uniform_rescale_factor(normal_meta):
     initial_status = get_dicom_status(normal_meta)
     
     meta_copy = copy.deepcopy(normal_meta)
-    num = meta_copy.num_datasets
+    num = meta_copy.slice_count
     if num < 2:
         pytest.skip("需要至少2帧才能测试非统一的Intercept/Slope")
 
