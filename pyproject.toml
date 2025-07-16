@@ -12,7 +12,7 @@ name = "dicube"
 dynamic = ["version"]
 description = "Medical Image Storage Library with DICOM compatibility"
 readme = "README.md"
-authors = [{name = "liaofz"}]
+authors = [{name = "Fangzhou Liao"}]
 license = {text = "MIT"}
 requires-python = ">=3.8"
 classifiers = [
@@ -47,13 +47,15 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0.0",
     "build>=0.8.0",
+    "pylibjpeg>=2.0",
+    "pylibjpeg-openjpeg>=2.0",
 ]
 all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
 
 [project.urls]
-"Homepage" = "https://github.com/username/dicube"
-"Bug Reports" = "https://github.com/username/dicube/issues"
-"Source" = "https://github.com/username/dicube"
+"Homepage" = "https://github.com/fastdiag-toolbox/dicube"
+"Bug Reports" = "https://github.com/fastdiag-toolbox/dicube/issues"
+"Source" = "https://github.com/fastdiag-toolbox/dicube"
 
 [tool.scikit-build]
 cmake.build-type = "Release"

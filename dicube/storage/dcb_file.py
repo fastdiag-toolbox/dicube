@@ -71,6 +71,7 @@ class DcbFile:
     HEADER_STRUCT = "<8sI13Q"
     MAGIC = b"DCMCUBE\x00"
     VERSION = 1
+    TRANSFER_SYNTAX_UID = None  # Base class has no specific transfer syntax
 
     def __init__(self, filename: str, mode: str = "r"):
         """
@@ -483,6 +484,15 @@ class DcbFile:
             f.seek(hdr["dicom_status_offset"])
             raw_bin = f.read(hdr["dicom_status_length"])
         return raw_bin.decode("utf-8")
+    
+    def get_transfer_syntax_uid(self) -> Optional[str]:
+        """
+        Get the DICOM Transfer Syntax UID for this file type.
+        
+        Returns:
+            str: DICOM Transfer Syntax UID, or None if not applicable
+        """
+        return self.TRANSFER_SYNTAX_UID
 
 
 
@@ -496,6 +506,8 @@ class DcbSFile(DcbFile):
 
     MAGIC = b"DCMCUBES"
     VERSION = 1
+    TRANSFER_SYNTAX_UID = "1.2.840.10008.1.2.4.201"  # HTJ2K Lossless
+    CODEC_NAME = "jph"
 
     def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
         """
@@ -507,7 +519,7 @@ class DcbSFile(DcbFile):
         Returns:
             bytes: OJPH encoded image data
         """
-        jph_codec = get_codec('jph')
+        jph_codec = get_codec(self.CODEC_NAME)
         return jph_codec.encode(frame_data, reversible=True, num_decompositions=6)
 
     def _decode_one_frame(self, bytes) -> np.ndarray:
@@ -520,7 +532,7 @@ class DcbSFile(DcbFile):
         Returns:
             np.ndarray: Decoded image array
         """
-        jph_codec = get_codec('jph')
+        jph_codec = get_codec(self.CODEC_NAME)
         return jph_codec.decode(bytes) 
     
 
@@ -532,6 +544,8 @@ class DcbAFile(DcbFile):
 
     MAGIC = b"DCMCUBEA"
     VERSION = 1
+    TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
+    CODEC_NAME = None  # To be defined when codec is selected
 
     NotImplementedError("DcbAFile is not implemented yet, no suitable codec")
 
@@ -545,5 +559,7 @@ class DcbLFile(DcbFile):
 
     MAGIC = b"DCMCUBEL"
     VERSION = 1
+    TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
+    CODEC_NAME = None  # To be defined when codec is selected
 
     NotImplementedError("DcbLFile is not implemented yet, no suitable codec")
