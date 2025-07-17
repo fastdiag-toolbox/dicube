@@ -7,15 +7,7 @@
 #include <stdexcept>
 #include <cstdint>
 
-// Handle ssize_t platform compatibility
-#if defined(_MSC_VER) && !defined(HAVE_SSIZE_T) && !defined(ssize_t)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#define HAVE_SSIZE_T 1
-#endif
-
-// Use pybind11's ssize_t as a fallback
-using ssize_type = py::ssize_t;
+// 此文件不需要ssize_t定义
 
 
 #include "ojph_file.h"
