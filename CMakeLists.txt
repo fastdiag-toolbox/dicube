@@ -107,6 +107,8 @@ if(DICUBE_BUILD_PYTHON_EXTENSIONS)
         target_link_libraries(${target} PRIVATE ${OPENJPH_TARGET})
         set_target_properties(${target} PROPERTIES
             LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+            OUTPUT_NAME ${target}  # 确保输出名称匹配 Python 导入名
+            SUFFIX ${PYTHON_MODULE_EXTENSION}  # 使用标准后缀
         )
     endforeach()
     
