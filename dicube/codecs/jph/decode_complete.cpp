@@ -6,11 +6,15 @@
 #include <stdexcept>
 #include <cstdint>
 
-// Add Windows-specific ssize_t definition
-#if defined(_MSC_VER)
+// Handle ssize_t platform compatibility
+#if defined(_MSC_VER) && !defined(HAVE_SSIZE_T) && !defined(ssize_t)
 #include <BaseTsd.h>
 typedef SSIZE_T ssize_t;
+#define HAVE_SSIZE_T 1
 #endif
+
+// Use pybind11's ssize_t as a fallback
+using ssize_type = py::ssize_t;
 
 
 #include "ojph_file.h"
@@ -83,8 +87,8 @@ py::array decode_image_impl(codestream &cs, MemInfile &infile,
 
     if (num_components == 1) {
         // 构造 numpy 数组形状 (height, width)
-        std::vector<ssize_t> shape = { static_cast<ssize_t>(height), static_cast<ssize_t>(width) };
-        std::vector<ssize_t> strides = { static_cast<ssize_t>(sizeof(T)) * width, static_cast<ssize_t>(sizeof(T)) };
+        std::vector<ssize_type> shape = { static_cast<ssize_type>(height), static_cast<ssize_type>(width) };
+        std::vector<ssize_type> strides = { static_cast<ssize_type>(sizeof(T)) * width, static_cast<ssize_type>(sizeof(T)) };
         py::array result(py::buffer_info(planar_data.data(), sizeof(T),
                                          py::format_descriptor<T>::format(),
                                          2, shape, strides));
@@ -103,12 +107,12 @@ py::array decode_image_impl(codestream &cs, MemInfile &infile,
                 }
             }
         }
-        std::vector<ssize_t> shape = { static_cast<ssize_t>(height),
-                                       static_cast<ssize_t>(width),
-                                       static_cast<ssize_t>(num_components) };
-        std::vector<ssize_t> strides = { static_cast<ssize_t>(sizeof(T)) * width * num_components,
-                                         static_cast<ssize_t>(sizeof(T)) * num_components,
-                                         static_cast<ssize_t>(sizeof(T)) };
+        std::vector<ssize_type> shape = { static_cast<ssize_type>(height),
+                                       static_cast<ssize_type>(width),
+                                       static_cast<ssize_type>(num_components) };
+        std::vector<ssize_type> strides = { static_cast<ssize_type>(sizeof(T)) * width * num_components,
+                                         static_cast<ssize_type>(sizeof(T)) * num_components,
+                                         static_cast<ssize_type>(sizeof(T)) };
         py::array result(py::buffer_info(interleaved.data(), sizeof(T),
                                          py::format_descriptor<T>::format(),
                                          3, shape, strides));
