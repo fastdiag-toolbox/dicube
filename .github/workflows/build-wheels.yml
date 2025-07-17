@@ -30,7 +30,10 @@ jobs:
           python -m pip install --upgrade pip
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.16.2
+        # Using explicit command to avoid empty parameter issues on Windows
+        run: |
+          python -m pip install cibuildwheel==2.16.2
+          python -m cibuildwheel
         env:
           CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
           CIBW_SKIP: pp* *-musllinux*
@@ -90,7 +93,7 @@ jobs:
         env:
           SETUPTOOLS_SCM_PRETEND_VERSION: "0.1.0"
         run: |
-          pip install build
+          pip install build setuptools_scm
           python -m build --sdist
 
       - uses: actions/upload-artifact@v4
