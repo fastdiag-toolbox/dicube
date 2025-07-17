@@ -105,11 +105,24 @@ if(DICUBE_BUILD_PYTHON_EXTENSIONS)
             ${NUMPY_INCLUDE_DIR}
         )
         target_link_libraries(${target} PRIVATE ${OPENJPH_TARGET})
-        set_target_properties(${target} PROPERTIES
-            LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
-            OUTPUT_NAME ${target}  # 确保输出名称匹配 Python 导入名
-            SUFFIX ${PYTHON_MODULE_EXTENSION}  # 使用标准后缀
-        )
+        
+        # 确保 .pyd/.so 文件直接放在正确的目录，不带 Release 子目录
+        if(MSVC)
+            # Windows特殊处理，防止产生 Release 子目录
+            set_target_properties(${target} PROPERTIES
+                RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+                RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+                RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+                LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+                LIBRARY_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+                LIBRARY_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+            )
+        else()
+            # Linux/macOS
+            set_target_properties(${target} PROPERTIES
+                LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/dicube/codecs/jph
+            )
+        endif()
     endforeach()
     
     message(STATUS "Python extensions configured (Python ${Python_VERSION})")

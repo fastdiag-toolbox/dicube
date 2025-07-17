@@ -69,9 +69,21 @@ sdist.include = [
     "build_scripts/*",
 ]
 
+sdist.exclude = [
+    "testdata/**/*",
+]
+
+# wheel包只需包含Python代码和编译好的扩展模块
 wheel.exclude = [
+    # 排除所有C++源码
     "dicube/**/*.cpp",
     "dicube/**/*.h",
+    # 排除测试数据
+    "testdata/**/*",
+    # 排除构建文件
+    "openjph/**/*",
+    "CMakeLists.txt",
+    "build_scripts/*",
 ]
 
 cmake.args = [
@@ -86,6 +98,10 @@ cmake.args = [
 
 [tool.scikit-build.wheel.packages]
 "dicube" = "dicube"
+
+[tool.scikit-build.wheel.install-dir]
+"*.pyd" = "dicube/codecs/jph"
+"*.so" = "dicube/codecs/jph"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
