@@ -7,11 +7,7 @@
 #include <stdexcept>
 #include <cstdint>
 
-// Add Windows-specific ssize_t definition
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
+// 此文件不需要ssize_t定义
 
 
 #include "ojph_file.h"
