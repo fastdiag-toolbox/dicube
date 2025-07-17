@@ -6,10 +6,15 @@
 #include <stdexcept>
 #include <cstdint>
 
-// Handle ssize_t platform compatibility
-#if defined(_MSC_VER)  && !defined(ssize_t)
+// 避免与Python的ssize_t定义冲突
+// 我们创建自己的ssize_t类型别名，而不是重新定义ssize_t
+#if defined(_MSC_VER) 
 #include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
+// 使用pybind11的ssize_t，避免重复定义
+using ojph_ssize_t = Py_ssize_t;
+#else
+// 在非Windows平台上使用标准ssize_t
+using ojph_ssize_t = ssize_t;
 #endif
 
 
@@ -84,8 +89,8 @@ py::array decode_image_impl(codestream &cs, MemInfile &infile,
 
     if (num_components == 1) {
         // 构造 numpy 数组形状 (height, width)
-        std::vector<ssize_t> shape = { static_cast<ssize_t>(height), static_cast<ssize_t>(width) };
-        std::vector<ssize_t> strides = { static_cast<ssize_t>(sizeof(T)) * width, static_cast<ssize_t>(sizeof(T)) };
+        std::vector<ojph_ssize_t> shape = { static_cast<ojph_ssize_t>(height), static_cast<ojph_ssize_t>(width) };
+        std::vector<ojph_ssize_t> strides = { static_cast<ojph_ssize_t>(sizeof(T)) * width, static_cast<ojph_ssize_t>(sizeof(T)) };
         py::array result(py::buffer_info(planar_data.data(), sizeof(T),
                                          py::format_descriptor<T>::format(),
                                          2, shape, strides));
@@ -104,12 +109,12 @@ py::array decode_image_impl(codestream &cs, MemInfile &infile,
                 }
             }
         }
-        std::vector<ssize_t> shape = { static_cast<ssize_t>(height),
-                                       static_cast<ssize_t>(width),
-                                       static_cast<ssize_t>(num_components) };
-        std::vector<ssize_t> strides = { static_cast<ssize_t>(sizeof(T)) * width * num_components,
-                                         static_cast<ssize_t>(sizeof(T)) * num_components,
-                                         static_cast<ssize_t>(sizeof(T)) };
+        std::vector<ojph_ssize_t> shape = { static_cast<ojph_ssize_t>(height),
+                                       static_cast<ojph_ssize_t>(width),
+                                       static_cast<ojph_ssize_t>(num_components) };
+        std::vector<ojph_ssize_t> strides = { static_cast<ojph_ssize_t>(sizeof(T)) * width * num_components,
+                                         static_cast<ojph_ssize_t>(sizeof(T)) * num_components,
+                                         static_cast<ojph_ssize_t>(sizeof(T)) };
         py::array result(py::buffer_info(interleaved.data(), sizeof(T),
                                          py::format_descriptor<T>::format(),
                                          3, shape, strides));
