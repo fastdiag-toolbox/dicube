@@ -7,6 +7,13 @@
 #include <stdexcept>
 #include <cstdint>
 
+// Add Windows-specific ssize_t definition
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#endif
+
+
 #include "ojph_file.h"
 #include "ojph_codestream.h"
 #include "ojph_mem.h"
