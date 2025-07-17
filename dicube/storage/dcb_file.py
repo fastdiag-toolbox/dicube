@@ -180,6 +180,170 @@ class DcbFile:
         }
         return self._header
 
+    def _prepare_metadata(
+        self, 
+        pixel_header: PixelDataHeader,
+        dicom_meta: Optional[DicomMeta] = None,
+        space: Optional[Space] = None,
+        dicom_status: Optional[DicomStatus] = None,
+    ):
+        """Prepare metadata for writing to DCB file.
+        
+        Args:
+            pixel_header (PixelDataHeader): Pixel data header information.
+            dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
+            space (Space, optional): Spatial information. Defaults to None.
+            dicom_status (DicomStatus, optional): DICOM status. Defaults to None.
+            
+        Returns:
+            dict: Dictionary containing prepared metadata components.
+        """
+        # Process dicom_status
+        if dicom_status is None:
+            # If not provided, try to get from pixel_header (backward compatibility)
+            if hasattr(pixel_header, "DicomStatus"):
+                dicom_status = pixel_header.DicomStatus
+            else:
+                dicom_status = DicomStatus.CONSISTENT
+
+        # Handle both enum and string values for dicom_status
+        if isinstance(dicom_status, DicomStatus):
+            dicom_status_bin = dicom_status.value.encode("utf-8")
+        else:
+            # If it's already a string, encode it directly
+            dicom_status_bin = dicom_status.encode("utf-8")
+
+        # Process dicom_meta
+        if dicom_meta:
+            dicommeta_json = dicom_meta.to_json().encode("utf-8")
+            dicommeta_gz = zstd.compress(dicommeta_json)
+        else:
+            dicommeta_gz = b""
+
+        # Process space
+        if space:
+            # Convert space from internal (z,y,x) to file (x,y,z) format
+            space_xyz = space.reverse_axis_order()
+            space_json = space_xyz.to_json().encode("utf-8")
+        else:
+            space_json = b""
+
+        # Process pixel_header
+        pixel_header_bin = pixel_header.to_json().encode("utf-8")
+        
+        return {
+            'dicom_status_bin': dicom_status_bin,
+            'dicommeta_gz': dicommeta_gz,
+            'space_json': space_json,
+            'pixel_header_bin': pixel_header_bin
+        }
+    
+    def _encode_frames(self, images: List, num_threads: int = 4):
+        """Encode frames using parallel or serial processing.
+        
+        Args:
+            images (List): List of frames to encode.
+            num_threads (int): Number of worker threads for parallel encoding.
+            
+        Returns:
+            List[bytes]: List of encoded frame data.
+        """
+        if num_threads is not None and num_threads > 1:
+            # Parallel encoding
+            with ThreadPoolExecutor(max_workers=num_threads) as executor:
+                encoded_blobs = list(
+                    executor.map(lambda x: self._encode_one_frame(x), images)
+                )
+            return encoded_blobs
+        else:
+            # Serial encoding
+            encoded_blobs = []
+            for one_frame in images:
+                encoded_bytes = self._encode_one_frame(one_frame)
+                encoded_blobs.append(encoded_bytes)
+            return encoded_blobs
+    
+    def _write_file_structure(self, f, metadata_components, encoded_frames, frame_count):
+        """Write the complete file structure including metadata and frames.
+        
+        Args:
+            f: File handle for writing.
+            metadata_components (dict): Prepared metadata components.
+            encoded_frames (List[bytes]): List of encoded frame data.
+            frame_count (int): Number of frames.
+            
+        Returns:
+            dict: Dictionary containing offset and length information for header.
+        """
+        # Write dicom_status
+        dicom_status_offset = f.tell()
+        f.write(metadata_components['dicom_status_bin'])
+        dicom_status_length = f.tell() - dicom_status_offset
+
+        # Write dicommeta_gz
+        dicommeta_offset = f.tell()
+        f.write(metadata_components['dicommeta_gz'])
+        dicommeta_length = f.tell() - dicommeta_offset
+
+        # Write space_json
+        space_offset = f.tell()
+        f.write(metadata_components['space_json'])
+        space_length = f.tell() - space_offset
+
+        # Write pixel_header_bin
+        pixel_header_offset = f.tell()
+        f.write(metadata_components['pixel_header_bin'])
+        pixel_header_length = f.tell() - pixel_header_offset
+
+        # Reserve offsets / lengths space
+        frame_offsets_offset = f.tell()
+        f.write(b"\x00" * (8 * frame_count))
+        frame_offsets_length = 8 * frame_count
+
+        frame_lengths_offset = f.tell()
+        f.write(b"\x00" * (8 * frame_count))
+        frame_lengths_length = 8 * frame_count
+
+        # Write frames and collect offset/length info
+        offsets = []
+        lengths = []
+        
+        for encoded_bytes in encoded_frames:
+            offset_here = f.tell()
+            f.write(encoded_bytes)
+            length_here = f.tell() - offset_here
+
+            offsets.append(offset_here)
+            lengths.append(length_here)
+
+        # Backfill offsets & lengths
+        current_pos = f.tell()
+        f.seek(frame_offsets_offset)
+        for off in offsets:
+            f.write(struct.pack("<Q", off))
+
+        f.seek(frame_lengths_offset)
+        for lng in lengths:
+            f.write(struct.pack("<Q", lng))
+
+        # Go back to the end of the file
+        f.seek(current_pos)
+        
+        return {
+            'dicom_status_offset': dicom_status_offset,
+            'dicom_status_length': dicom_status_length,
+            'dicommeta_offset': dicommeta_offset,
+            'dicommeta_length': dicommeta_length,
+            'space_offset': space_offset,
+            'space_length': space_length,
+            'pixel_header_offset': pixel_header_offset,
+            'pixel_header_length': pixel_header_length,
+            'frame_offsets_offset': frame_offsets_offset,
+            'frame_offsets_length': frame_offsets_length,
+            'frame_lengths_offset': frame_lengths_offset,
+            'frame_lengths_length': frame_lengths_length,
+        }
+
     def write(
         self,
         images: List,  # Can be List[np.ndarray] or List[Tuple] for ROI data
@@ -207,136 +371,44 @@ class DcbFile:
             images = []
         frame_count = len(images)
 
-        # (1) Process dicom_status
-        if dicom_status is None:
-            # If not provided, try to get from pixel_header (backward compatibility)
-            if hasattr(pixel_header, "DicomStatus"):
-                dicom_status = pixel_header.DicomStatus
-            else:
-                dicom_status = DicomStatus.CONSISTENT
+        # Prepare metadata components
+        metadata_components = self._prepare_metadata(
+            pixel_header, dicom_meta, space, dicom_status
+        )
+        
+        # Encode frames
+        encoded_frames = self._encode_frames(images, num_threads)
 
-        # Handle both enum and string values for dicom_status
-        if isinstance(dicom_status, DicomStatus):
-            dicom_status_bin = dicom_status.value.encode("utf-8")
-        else:
-            # If it's already a string, encode it directly
-            dicom_status_bin = dicom_status.encode("utf-8")
-
-        # (2) Process dicom_meta
-        if dicom_meta:
-            dicommeta_json = dicom_meta.to_json().encode("utf-8")
-            dicommeta_gz = zstd.compress(dicommeta_json)
-        else:
-            dicommeta_gz = b""
-
-        # (3) Process space
-        if space:
-            # Convert space from internal (z,y,x) to file (x,y,z) format
-            space_xyz = space.reverse_axis_order()
-            space_json = space_xyz.to_json().encode("utf-8")
-        else:
-            space_json = b""
-
-        # (4) Process pixel_header
-        pixel_header_bin = pixel_header.to_json().encode("utf-8")
-
-        # (5) Write a placeholder header
+        # Write file structure
         header_size = struct.calcsize(self.HEADER_STRUCT)
-
+        
         with open(self.filename, "wb") as f:
-            f.write(b"\x00" * header_size)  # Placeholder
+            # Write placeholder header
+            f.write(b"\x00" * header_size)
+            
+            # Write file structure and get offset information
+            offset_info = self._write_file_structure(
+                f, metadata_components, encoded_frames, frame_count
+            )
 
-            # (6) Write dicom_status
-            dicom_status_offset = f.tell()
-            f.write(dicom_status_bin)
-            dicom_status_length = f.tell() - dicom_status_offset
-
-            # (7) Write dicommeta_gz
-            dicommeta_offset = f.tell()
-            f.write(dicommeta_gz)
-            dicommeta_length = f.tell() - dicommeta_offset
-
-            # (8) Write space_json
-            space_offset = f.tell()
-            f.write(space_json)
-            space_length = f.tell() - space_offset
-
-            # (9) Write pixel_header_bin
-            pixel_header_offset = f.tell()
-            f.write(pixel_header_bin)
-            pixel_header_length = f.tell() - pixel_header_offset
-
-            # (10) Reserve offsets / lengths space
-            frame_offsets_offset = f.tell()
-            f.write(b"\x00" * (8 * frame_count))
-            frame_offsets_length = 8 * frame_count
-
-            frame_lengths_offset = f.tell()
-            f.write(b"\x00" * (8 * frame_count))
-            frame_lengths_length = 8 * frame_count
-
-            # (11) Encode frames
-            offsets = []
-            lengths = []
-
-            if num_threads is not None and num_threads > 1:
-                # Parallel encoding
-                with ThreadPoolExecutor(max_workers=num_threads) as executor:
-                    # Encode all frames first
-                    encoded_blobs = list(
-                        executor.map(lambda x: self._encode_one_frame(x), images)
-                    )
-
-                    # Write to file and record offset/length
-                    for encoded_bytes in encoded_blobs:
-                        offset_here = f.tell()
-                        f.write(encoded_bytes)
-                        length_here = f.tell() - offset_here
-
-                        offsets.append(offset_here)
-                        lengths.append(length_here)
-            else:
-                # Serial encoding
-                for one_frame in images:
-                    offset_here = f.tell()
-                    encoded_bytes = self._encode_one_frame(one_frame)
-                    f.write(encoded_bytes)
-                    length_here = f.tell() - offset_here
-
-                    offsets.append(offset_here)
-                    lengths.append(length_here)
-
-            # (12) Backfill offsets & lengths
-            current_pos = f.tell()
-            f.seek(frame_offsets_offset)
-            for off in offsets:
-                f.write(struct.pack("<Q", off))
-
-            f.seek(frame_lengths_offset)
-            for lng in lengths:
-                f.write(struct.pack("<Q", lng))
-
-            # Go back to the end of the file
-            f.seek(current_pos)
-
-            # (13) Backfill header
+            # Backfill header
             f.seek(0)
             header_data = struct.pack(
                 self.HEADER_STRUCT,
                 self.MAGIC,
                 self.VERSION,
-                dicom_status_offset,
-                dicom_status_length,
-                dicommeta_offset,
-                dicommeta_length,
-                space_offset,
-                space_length,
-                pixel_header_offset,
-                pixel_header_length,
-                frame_offsets_offset,
-                frame_offsets_length,
-                frame_lengths_offset,
-                frame_lengths_length,
+                offset_info['dicom_status_offset'],
+                offset_info['dicom_status_length'],
+                offset_info['dicommeta_offset'],
+                offset_info['dicommeta_length'],
+                offset_info['space_offset'],
+                offset_info['space_length'],
+                offset_info['pixel_header_offset'],
+                offset_info['pixel_header_length'],
+                offset_info['frame_offsets_offset'],
+                offset_info['frame_offsets_length'],
+                offset_info['frame_lengths_offset'],
+                offset_info['frame_lengths_length'],
                 frame_count,
             )
             f.write(header_data)

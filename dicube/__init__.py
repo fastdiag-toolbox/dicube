@@ -37,23 +37,23 @@ except ImportError:
     __version__ = "0.1.0"
 
 # Top-level convenience methods
-def load(filename: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:
+def load(file_path: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:
     """Load a DicomCubeImage from a file.
     
     Args:
-        filename (str): Path to the input file.
+        file_path (str): Path to the input file.
         num_threads (int): Number of parallel decoding threads. Defaults to 4.
         **kwargs: Additional parameters passed to the underlying reader.
     
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load(filename, num_threads, **kwargs)
+    return DicomCubeImageIO.load(file_path, num_threads, **kwargs)
 
 
 def save(
     image: DicomCubeImage,
-    filename: str,
+    file_path: str,
     file_type: str = "s",
     num_threads: int = 4,
     **kwargs
@@ -62,13 +62,13 @@ def save(
     
     Args:
         image (DicomCubeImage): The image object to save.
-        filename (str): Output file path.
+        file_path (str): Output file path.
         file_type (str): File type, "s" (speed priority), "a" (compression priority), 
                         or "l" (lossy compression). Defaults to "s".
         num_threads (int): Number of parallel encoding threads. Defaults to 4.
         **kwargs: Additional parameters passed to the underlying writer.
     """
-    return DicomCubeImageIO.save(image, filename, file_type, num_threads, **kwargs)
+    return DicomCubeImageIO.save(image, file_path, file_type, num_threads, **kwargs)
 
 
 def load_from_dicom_folder(
@@ -90,32 +90,32 @@ def load_from_dicom_folder(
     return DicomCubeImageIO.load_from_dicom_folder(folder_path, sort_method, **kwargs)
 
 
-def load_from_nifti(nii_path: str, **kwargs) -> DicomCubeImage:
+def load_from_nifti(file_path: str, **kwargs) -> DicomCubeImage:
     """Load a DicomCubeImage from a NIfTI file.
     
     Args:
-        nii_path (str): Path to the NIfTI file.
+        file_path (str): Path to the NIfTI file.
         **kwargs: Additional parameters.
     
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load_from_nifti(nii_path, **kwargs)
+    return DicomCubeImageIO.load_from_nifti(file_path, **kwargs)
 
 
 def save_to_dicom_folder(
     image: DicomCubeImage,
-    output_dir: str,
+    folder_path: str,
     **kwargs
 ) -> None:
     """Save a DicomCubeImage as a DICOM folder.
     
     Args:
         image (DicomCubeImage): The image object to save.
-        output_dir (str): Output directory path.
+        folder_path (str): Output directory path.
         **kwargs: Additional parameters.
     """
-    return DicomCubeImageIO.save_to_dicom_folder(image, output_dir)
+    return DicomCubeImageIO.save_to_dicom_folder(image, folder_path)
 
 
 __all__ = [

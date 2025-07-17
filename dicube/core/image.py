@@ -44,6 +44,12 @@ class DicomCubeImage:
             dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
             space (Space, optional): Spatial information. Defaults to None.
         """
+        # Validate required parameters
+        if raw_image is None:
+            raise ValueError("raw_image cannot be None in DicomCubeImage constructor")
+        if pixel_header is None:
+            raise ValueError("pixel_header cannot be None in DicomCubeImage constructor")
+        
         self.raw_image = raw_image
         self.pixel_header = pixel_header
         self.dicom_meta = dicom_meta
@@ -52,76 +58,96 @@ class DicomCubeImage:
         self._validate_shape()
 
 
-    def init_meta(
-        self,
-        modality: str = "OT",
-        patient_name: str = "ANONYMOUS^",
-        patient_id: str = "0000000",
-    ) -> DicomMeta:
-        """Initialize a basic DicomMeta when none is provided.
-
-        Sets required DICOM fields with default values.
-
-        Args:
-            modality (str): Image modality, such as CT/MR/PT. Defaults to "OT".
-            patient_name (str): Patient name. Defaults to "ANONYMOUS^".
-            patient_id (str): Patient ID. Defaults to "0000000".
-
+    def _generate_uids(self):
+        """Generate necessary UIDs for DICOM metadata.
+        
         Returns:
-            DicomMeta: A new DicomMeta instance with basic required fields.
+            dict: Dictionary containing generated UIDs.
         """
-        import datetime
-
         from pydicom.uid import generate_uid
-
-        # Create empty DicomMeta
-        num_slices = self.raw_image.shape[0] if len(self.raw_image.shape) == 3 else 1
-        meta = DicomMeta({}, [f"slice_{i:04d}.dcm" for i in range(num_slices)])
-
-        # Generate necessary UIDs
-        study_uid = generate_uid()
-        series_uid = generate_uid()
-        sop_uid = generate_uid()
-        frame_uid = generate_uid()
-
-        # Get current date and time
-        now = datetime.datetime.now()
-        date_str = now.strftime("%Y%m%d")
-        time_str = now.strftime("%H%M%S")
-
-        # Patient Information
-        meta.set_shared_item(CommonTags.PatientName, {'Alphabetic':patient_name})
+        
+        return {
+            'study_uid': generate_uid(),
+            'series_uid': generate_uid(),
+            'sop_uid': generate_uid(),
+            'frame_uid': generate_uid()
+        }
+    
+    def _set_patient_info(self, meta: DicomMeta, patient_name: str, patient_id: str):
+        """Set patient information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+            patient_name (str): Patient name.
+            patient_id (str): Patient ID.
+        """
+        meta.set_shared_item(CommonTags.PatientName, {'Alphabetic': patient_name})
         meta.set_shared_item(CommonTags.PatientID, patient_id)
         meta.set_shared_item(CommonTags.PatientBirthDate, "19700101")
         meta.set_shared_item(CommonTags.PatientSex, "O")
-
-        # Study Information
-        meta.set_shared_item(CommonTags.StudyInstanceUID, study_uid)
+    
+    def _set_study_info(self, meta: DicomMeta, uids: dict, modality: str):
+        """Set study information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+            uids (dict): Dictionary containing generated UIDs.
+            modality (str): Image modality.
+        """
+        import datetime
+        
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y%m%d")
+        time_str = now.strftime("%H%M%S")
+        
+        meta.set_shared_item(CommonTags.StudyInstanceUID, uids['study_uid'])
         meta.set_shared_item(CommonTags.StudyDate, date_str)
         meta.set_shared_item(CommonTags.StudyTime, time_str)
         meta.set_shared_item(CommonTags.StudyID, "1")
         meta.set_shared_item(CommonTags.StudyDescription, f"Default {modality} Study")
-
-        # Series Information
-        meta.set_shared_item(CommonTags.SeriesInstanceUID, series_uid)
+    
+    def _set_series_info(self, meta: DicomMeta, uids: dict, modality: str):
+        """Set series information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+            uids (dict): Dictionary containing generated UIDs.
+            modality (str): Image modality.
+        """
+        meta.set_shared_item(CommonTags.SeriesInstanceUID, uids['series_uid'])
         meta.set_shared_item(CommonTags.SeriesNumber, "1")
         meta.set_shared_item(
             CommonTags.SeriesDescription, f"Default {modality} Series"
         )
-
-        # Image Information
+    
+    def _set_image_info(self, meta: DicomMeta, uids: dict, num_slices: int):
+        """Set image-specific information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+            uids (dict): Dictionary containing generated UIDs.
+            num_slices (int): Number of slices in the image.
+        """
+        from pydicom.uid import generate_uid
+        
         if num_slices > 1:
             sop_uids = [generate_uid() for _ in range(num_slices)]
             instance_numbers = [str(i + 1) for i in range(num_slices)]
             meta.set_nonshared_item(CommonTags.SOPInstanceUID, sop_uids)
             meta.set_nonshared_item(CommonTags.InstanceNumber, instance_numbers)
         else:
-            meta.set_shared_item(CommonTags.SOPInstanceUID, sop_uid)
+            meta.set_shared_item(CommonTags.SOPInstanceUID, uids['sop_uid'])
             meta.set_shared_item(CommonTags.InstanceNumber, "1")
 
-        meta.set_shared_item(CommonTags.FrameOfReferenceUID, frame_uid)
-
-        # Space Information
+        meta.set_shared_item(CommonTags.FrameOfReferenceUID, uids['frame_uid'])
+    
+    def _set_space_info(self, meta: DicomMeta, num_slices: int):
+        """Set spatial information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+            num_slices (int): Number of slices in the image.
+        """
         if self.space is not None:
             # Set orientation information
             orientation = self.space.to_dicom_orientation()
@@ -159,8 +185,14 @@ class DicomCubeImage:
                 meta.set_nonshared_item(CommonTags.ImagePositionPatient, positions)
             else:
                 meta.set_shared_item(CommonTags.ImagePositionPatient, [0, 0, 0])
-
-        # Pixel Information
+    
+    def _set_pixel_info(self, meta: DicomMeta):
+        """Set pixel data information in DICOM metadata.
+        
+        Args:
+            meta (DicomMeta): The metadata object to update.
+        """
+        # Image dimensions
         shape = self.raw_image.shape
         if len(shape) == 3:
             meta.set_shared_item(CommonTags.Rows, shape[1])
@@ -169,6 +201,7 @@ class DicomCubeImage:
             meta.set_shared_item(CommonTags.Rows, shape[0])
             meta.set_shared_item(CommonTags.Columns, shape[1])
 
+        # Pixel characteristics
         meta.set_shared_item(CommonTags.SamplesPerPixel, 1)
         meta.set_shared_item(CommonTags.PhotometricInterpretation, "MONOCHROME2")
         meta.set_shared_item(CommonTags.BitsAllocated, 16)
@@ -186,9 +219,46 @@ class DicomCubeImage:
                 CommonTags.RescaleIntercept, float(self.pixel_header.RESCALE_INTERCEPT)
             )
 
-        # Modality Information
+    def init_meta(
+        self,
+        modality: str = "OT",
+        patient_name: str = "ANONYMOUS^",
+        patient_id: str = "0000000",
+    ) -> DicomMeta:
+        """Initialize a basic DicomMeta when none is provided.
+
+        Sets required DICOM fields with default values.
+
+        Args:
+            modality (str): Image modality, such as CT/MR/PT. Defaults to "OT".
+            patient_name (str): Patient name. Defaults to "ANONYMOUS^".
+            patient_id (str): Patient ID. Defaults to "0000000".
+
+        Returns:
+            DicomMeta: A new DicomMeta instance with basic required fields.
+        """
+        # Create empty DicomMeta
+        num_slices = self.raw_image.shape[0] if len(self.raw_image.shape) == 3 else 1
+        meta = DicomMeta({}, [f"slice_{i:04d}.dcm" for i in range(num_slices)])
+
+        # Generate necessary UIDs
+        uids = self._generate_uids()
+        
+        # Set metadata sections
+        self._set_patient_info(meta, patient_name, patient_id)
+        self._set_study_info(meta, uids, modality)
+        self._set_series_info(meta, uids, modality)
+        self._set_image_info(meta, uids, num_slices)
+        self._set_space_info(meta, num_slices)
+        self._set_pixel_info(meta)
+        
+        # Set modality
         meta.set_shared_item(CommonTags.Modality, modality)
 
+        # Validate initialization success
+        if meta is None:
+            raise RuntimeError("DicomMeta initialization failed in init_meta operation")
+        
         self.dicom_meta = meta
         return meta
 
