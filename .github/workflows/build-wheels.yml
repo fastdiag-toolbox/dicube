@@ -68,7 +68,7 @@ jobs:
           
           # 简单的测试
           CIBW_TEST_COMMAND: |
-            python -c "from dicube.codecs.jph import JphCodec; print('✓ Import test passed')"
+            python -c "from dicube.codecs.jph import JphCodec; print('Import test passed successfully')"
 
       - uses: actions/upload-artifact@v4
         with:
