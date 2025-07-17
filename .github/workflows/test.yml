@@ -39,5 +39,5 @@ jobs:
           python -c "
           import dicube
           from dicube.codecs.jph import JphCodec
-          print(f'✅ dicube version: {dicube.__version__}')
+          print(f'dicube version: {dicube.__version__} - Import successful')
           " 
