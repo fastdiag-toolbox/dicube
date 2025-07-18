@@ -87,6 +87,12 @@ class TestFileIOIntegration:
     
     def test_load_from_nifti_nonexistent_file(self):
         """Test loading from non-existent NIfTI file."""
+        # Skip test if nibabel is not available
+        try:
+            import nibabel
+        except ImportError:
+            pytest.skip("nibabel not available, skipping NIfTI test")
+            
         with pytest.raises(InvalidCubeFileError) as error:
             DicomCubeImageIO.load_from_nifti("/nonexistent/file.nii")
         
@@ -95,6 +101,12 @@ class TestFileIOIntegration:
     
     def test_save_to_nifti_without_space(self):
         """Test saving to NIfTI without space information."""
+        # Skip test if nibabel is not available
+        try:
+            import nibabel
+        except ImportError:
+            pytest.skip("nibabel not available, skipping NIfTI test")
+            
         # Create a simple image without space information
         raw_data = np.random.randint(0, 1000, size=(5, 10, 15), dtype=np.uint16)
         pixel_header = PixelDataHeader(

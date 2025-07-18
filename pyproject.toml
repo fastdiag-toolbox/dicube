@@ -49,6 +49,7 @@ dev = [
     "build>=0.8.0",
     "pylibjpeg>=2.0",
     "pylibjpeg-openjpeg>=2.0",
+    "nibabel>=3.2.0", 
 ]
 all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
 
