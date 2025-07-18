@@ -38,10 +38,10 @@ jobs:
           python -m cibuildwheel
         env:
           CIBW_BUILD: cp38-* cp39-* cp310-* cp311-* cp312-*
-          CIBW_SKIP: pp* *-musllinux*
-          CIBW_ARCHS_LINUX: auto
+          CIBW_SKIP: pp* *-musllinux* *-win32 *-i686
+          CIBW_ARCHS_LINUX: x86_64 aarch64
           CIBW_ARCHS_MACOS: x86_64 arm64
-          CIBW_ARCHS_WINDOWS: auto
+          CIBW_ARCHS_WINDOWS: AMD64
           
           # 更健壮的依赖安装方式
           CIBW_BEFORE_ALL_LINUX: |

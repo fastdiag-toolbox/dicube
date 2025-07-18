@@ -239,6 +239,12 @@ class DicomCubeImageIO:
             intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
             wind_center = meta.get_shared_value(CommonTags.WindowCenter)
             wind_width = meta.get_shared_value(CommonTags.WindowWidth)
+            try:
+                wind_center = float(wind_center)
+                wind_width = float(wind_width)
+            except:
+                wind_center = None
+                wind_width = None
             
             # Create pixel_header
             pixel_header = PixelDataHeader(
@@ -246,8 +252,8 @@ class DicomCubeImageIO:
                 RescaleIntercept=float(intercept) if intercept is not None else 0.0,
                 OriginalPixelDtype=str(images[0].dtype),
                 PixelDtype=str(images[0].dtype),
-                WindowCenter=float(wind_center) if wind_center is not None else None,
-                WindowWidth=float(wind_width) if wind_width is not None else None,
+                WindowCenter=wind_center,
+                WindowWidth=wind_width,
             )
             
             # Validate PixelDataHeader initialization success
