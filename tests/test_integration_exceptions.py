@@ -7,7 +7,7 @@ import os
 from unittest.mock import Mock, patch, MagicMock
 
 from dicube.core.io import DicomCubeImageIO
-from dicube.core.factory import get_default_factory
+
 from dicube.core.image import DicomCubeImage
 from dicube.core.pixel_header import PixelDataHeader
 from dicube.storage.dcb_file import DcbSFile, DcbFile
@@ -117,63 +117,7 @@ class TestFileIOIntegration:
         assert "save_to_dicom_folder operation" in str(error)
 
 
-class TestFactoryIntegration:
-    """Test factory pattern integration with exception handling."""
-    
-    def test_create_image_with_none_raw_image(self):
-        """Test factory create_image with None raw_image."""
-        factory = get_default_factory()
-        pixel_header = Mock(spec=PixelDataHeader)
-        
-        with pytest.raises(DataConsistencyError) as exc_info:
-            factory.create_image(None, pixel_header)
-        
-        error = exc_info.value
-        assert "raw_image" in str(error)
-        assert "cannot be None" in str(error)
-        assert "DicomCubeImageFactory.create_image" in str(error)
-    
-    def test_create_image_with_invalid_array_dimensions(self):
-        """Test factory create_image with invalid array dimensions."""
-        factory = get_default_factory()
-        raw_image = np.array([1])  # 1D array
-        pixel_header = Mock(spec=PixelDataHeader)
-        
-        with pytest.raises(DataConsistencyError) as exc_info:
-            factory.create_image(raw_image, pixel_header)
-        
-        error = exc_info.value
-        assert "too few dimensions" in str(error)
-        assert "raw_image" in str(error)
-    
-    def test_create_image_with_invalid_pixel_header_type(self):
-        """Test factory create_image with invalid pixel_header type."""
-        factory = get_default_factory()
-        raw_image = np.array([[1, 2], [3, 4]])
-        
-        with pytest.raises(DataConsistencyError) as exc_info:
-            factory.create_image(raw_image, "not_pixel_header")
-        
-        error = exc_info.value
-        assert "incorrect type" in str(error)
-        assert "pixel_header" in str(error)
-    
-    @patch('dicube.core.image.DicomCubeImage')
-    def test_create_image_construction_failure(self, mock_image_class):
-        """Test factory create_image when DicomCubeImage construction fails."""
-        factory = get_default_factory()
-        raw_image = np.array([[1, 2], [3, 4]])
-        pixel_header = Mock(spec=PixelDataHeader)
-        
-        # Mock DicomCubeImage to raise an exception
-        mock_image_class.side_effect = Exception("Image construction failed")
-        
-        with pytest.raises(DataConsistencyError) as exc_info:
-            factory.create_image(raw_image, pixel_header)
-        
-        error = exc_info.value
-        assert "Failed to create DicomCubeImage" in str(error)
-        assert "Image construction failed" in str(error)
+
 
 
 class TestStorageIntegration:
@@ -269,8 +213,7 @@ class TestEndToEndErrorScenarios:
         """Test complete workflow from invalid input to proper error handling."""
         # Try to create an image with invalid parameters
         with pytest.raises(DataConsistencyError) as exc_info:
-            factory = get_default_factory()
-            factory.create_image(None, None)
+            DicomCubeImage(None, None)
         
         # Verify the error contains proper context and suggestions
         error = exc_info.value
@@ -284,8 +227,7 @@ class TestEndToEndErrorScenarios:
         raw_image = np.array([1])  # Invalid dimensions
         
         with pytest.raises(DataConsistencyError) as exc_info:
-            factory = get_default_factory()
-            factory.create_image(raw_image, "invalid_pixel_header")
+            DicomCubeImage(raw_image, "invalid_pixel_header")
         
         # Should catch the first validation error (raw_image dimensions)
         error = exc_info.value

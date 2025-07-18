@@ -18,7 +18,7 @@ from ..dicom.dicom_io import save_to_dicom_folder
 from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
 from ..storage.pixel_utils import derive_pixel_header_from_array
 from .pixel_header import PixelDataHeader
-from .factory import ImageFactory, get_default_factory
+
 from ..validation import (
     validate_not_none,
     validate_file_exists,
@@ -126,9 +126,6 @@ class DicomCubeImageIO:
         validate_not_none(file_path, "file_path", "load operation", InvalidCubeFileError)
         validate_file_exists(file_path, "load operation", InvalidCubeFileError)
         
-        # Use factory pattern to avoid circular dependency
-        factory = get_default_factory()
-        
         try:
             # Read file header to determine format
             header_size = struct.calcsize(DcbFile.HEADER_STRUCT)
@@ -160,7 +157,10 @@ class DicomCubeImageIO:
                 # Convert list to ndarray if needed
                 images = np.stack(images)
             
-            return factory.create_image(
+            # Use lazy import to avoid circular dependency
+            from .image import DicomCubeImage
+            
+            return DicomCubeImage(
                 raw_image=images,
                 pixel_header=pixel_header,
                 dicom_meta=dicom_meta,
@@ -199,9 +199,6 @@ class DicomCubeImageIO:
         # Validate required parameters
         validate_not_none(folder_path, "folder_path", "load_from_dicom_folder operation", InvalidCubeFileError)
         validate_folder_exists(folder_path, "load_from_dicom_folder operation", InvalidCubeFileError)
-        
-        # Use factory pattern to avoid circular dependency
-        factory = get_default_factory()
         
         try:
             # Read DICOM folder
@@ -265,7 +262,10 @@ class DicomCubeImageIO:
                     suggestion="Check DICOM metadata for required pixel data information"
                 )
             
-            return factory.create_image(
+            # Use lazy import to avoid circular dependency
+            from .image import DicomCubeImage
+            
+            return DicomCubeImage(
                 raw_image=np.array(images),
                 pixel_header=pixel_header,
                 dicom_meta=meta,
@@ -299,9 +299,6 @@ class DicomCubeImageIO:
         validate_not_none(file_path, "file_path", "load_from_nifti operation", InvalidCubeFileError)
         validate_file_exists(file_path, "load_from_nifti operation", InvalidCubeFileError)
         
-        # Use factory pattern to avoid circular dependency
-        factory = get_default_factory()
-        
         try:
             import nibabel as nib
         except ImportError:
@@ -316,7 +313,10 @@ class DicomCubeImageIO:
                 np.asarray(nii.dataobj, dtype=nii.dataobj.dtype)
             )
             
-            return factory.create_image(raw_image, header, space=space)
+            # Use lazy import to avoid circular dependency
+            from .image import DicomCubeImage
+            
+            return DicomCubeImage(raw_image, header, space=space)
         except Exception as e:
             if isinstance(e, ImportError):
                 raise
