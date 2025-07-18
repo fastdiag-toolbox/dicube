@@ -35,7 +35,7 @@ class DicomCubeImage:
         pixel_header (PixelDataHeader): Pixel data header containing metadata about the image pixels.
         dicom_meta (DicomMeta, optional): DICOM metadata associated with the image.
         space (Space, optional): Spatial information describing the image dimensions and orientation.
-        dicom_status (str, optional): DICOM status string. Defaults to DicomStatus.CONSISTENT.value.
+        dicom_status (DicomStatus): DICOM status enumeration. Defaults to DicomStatus.CONSISTENT.
     """
 
     def __init__(
@@ -44,7 +44,7 @@ class DicomCubeImage:
         pixel_header: PixelDataHeader,
         dicom_meta: Optional[DicomMeta] = None,
         space: Optional[Space] = None,
-        dicom_status: str = DicomStatus.CONSISTENT.value,
+        dicom_status: DicomStatus = DicomStatus.CONSISTENT,
     ):
         """Initialize a DicomCubeImage instance.
 

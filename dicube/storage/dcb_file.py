@@ -284,12 +284,9 @@ class DcbFile:
             else:
                 dicom_status = DicomStatus.CONSISTENT
 
-        # Handle both enum and string values for dicom_status
-        if isinstance(dicom_status, DicomStatus):
-            dicom_status_bin = dicom_status.value.encode("utf-8")
-        else:
-            # If it's already a string, encode it directly
-            dicom_status_bin = dicom_status.encode("utf-8")
+        # Convert DicomStatus enum to string for storage
+        # If None was provided, dicom_status will be a DicomStatus enum at this point
+        dicom_status_bin = dicom_status.value.encode("utf-8")
 
         # Process dicom_meta
         if dicom_meta:
@@ -427,9 +424,9 @@ class DcbFile:
         images: List,  # Can be List[np.ndarray] or List[Tuple] for ROI data
         pixel_header: PixelDataHeader,
         dicom_meta: Optional[DicomMeta] = None,
+        dicom_status: DicomStatus = DicomStatus.CONSISTENT,
         space: Optional[Space] = None,
         num_threads: int = 4,
-        dicom_status: Optional[DicomStatus] = None,
     ):
         """Write image data and metadata to a DCB file.
 
@@ -441,9 +438,9 @@ class DcbFile:
                 or List[Tuple[np.ndarray, np.ndarray, np.ndarray]] for ROI files.
             pixel_header (PixelDataHeader): PixelDataHeader instance containing pixel metadata.
             dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
+            dicom_status (DicomStatus): DICOM status enumeration. Defaults to DicomStatus.CONSISTENT.
             space (Space, optional): Spatial information. Defaults to None.
             num_threads (int): Number of worker threads for parallel encoding. Defaults to 4.
-            dicom_status (str, optional): DICOM status string value. Defaults to None.
         """
         if images is None:
             images = []
@@ -692,18 +689,18 @@ class DcbFile:
         """
         raise NotImplementedError("Subclass must implement _decode_one_frame")
 
-    def read_dicom_status(self) -> str:
+    def read_dicom_status(self) -> DicomStatus:
         """Read DICOM status information from the file.
 
         Returns:
-            str: The DICOM status string, or DicomStatus.CONSISTENT.value if not present.
+            DicomStatus: The DICOM status enum value, or DicomStatus.CONSISTENT if not present.
         """
         hdr = self.header
         dicom_status_offset = hdr["dicom_status_offset"]
         dicom_status_length = hdr["dicom_status_length"]
 
         if dicom_status_length == 0:
-            return DicomStatus.CONSISTENT.value
+            return DicomStatus.CONSISTENT
 
         with open(self.filename, "rb") as f:
             f.seek(dicom_status_offset)
