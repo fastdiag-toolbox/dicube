@@ -1,5 +1,6 @@
 .kiro
 trash
+dicube/_version.py
 *.mska
 *.msk
 *.nii

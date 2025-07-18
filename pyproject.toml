@@ -110,6 +110,5 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 
 [tool.setuptools_scm]
-write_to = "dicube/_version.py"
 version_scheme = "no-guess-dev"
 local_scheme = "no-local-version" 

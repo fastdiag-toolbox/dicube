@@ -31,10 +31,13 @@ from .dicom import (
     read_dicom_dir,
 )
 
+from importlib.metadata import version as _pkg_version, PackageNotFoundError
+
 try:
-    from ._version import __version__
-except ImportError:
-    __version__ = "0.1.0"
+    __version__ = _pkg_version("dicube")
+except PackageNotFoundError:
+    # editable install / source tree
+    __version__ = "0.1.0+unknown"
 
 # Top-level convenience methods
 def load(file_path: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:
