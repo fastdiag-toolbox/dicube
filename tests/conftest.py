@@ -91,3 +91,15 @@ def dicom_meta(dicom_files):
         datasets, 
         [os.path.basename(f) for f in dicom_files]
     ) 
+
+
+@pytest.fixture(scope="module")
+def sample_nifti_file():
+    """
+    Sample NIfTI file fixture
+    """
+    nifti_file = "testdata/nifti/s0000.nii.gz"
+    if os.path.exists(nifti_file):
+        return nifti_file
+    else:
+        pytest.skip(f"Sample NIfTI file not found: {nifti_file}") 

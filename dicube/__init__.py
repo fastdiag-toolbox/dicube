@@ -136,6 +136,22 @@ def save_to_dicom_folder(
     return DicomCubeImageIO.save_to_dicom_folder(image, folder_path)
 
 
+def save_to_nifti(
+    image: DicomCubeImage,
+    file_path: str,
+) -> None:
+    """Save a DicomCubeImage as a NIfTI file.
+    
+    Args:
+        image (DicomCubeImage): The image object to save.
+        file_path (str): Output file path.
+    
+    Raises:
+        ImportError: When nibabel is not installed.
+    """
+    return DicomCubeImageIO.save_to_nifti(image, file_path)
+
+
 __all__ = [
     "DicomCubeImage",
     "DicomMeta",
@@ -150,6 +166,7 @@ __all__ = [
     "load_from_dicom_folder",
     "load_from_nifti",
     "save_to_dicom_folder",
+    "save_to_nifti",
     "set_num_threads",
     "get_num_threads",
     # IO class (for direct use if needed)

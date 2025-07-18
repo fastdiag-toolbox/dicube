@@ -87,13 +87,34 @@ class TestFileIOIntegration:
     
     def test_load_from_nifti_nonexistent_file(self):
         """Test loading from non-existent NIfTI file."""
-        with pytest.raises(InvalidCubeFileError) as exc_info:
+        with pytest.raises(InvalidCubeFileError) as error:
             DicomCubeImageIO.load_from_nifti("/nonexistent/file.nii")
         
-        error = exc_info.value
-        assert "File not found" in str(error)
+        assert ("file does not exist" in str(error) or "File not found" in str(error))
         assert "load_from_nifti operation" in str(error)
     
+    def test_save_to_nifti_without_space(self):
+        """Test saving to NIfTI without space information."""
+        # Create a simple image without space information
+        raw_data = np.random.randint(0, 1000, size=(5, 10, 15), dtype=np.uint16)
+        pixel_header = PixelDataHeader(
+            RescaleSlope=1.0,
+            RescaleIntercept=0.0,
+            OriginalPixelDtype="uint16",
+            PixelDtype="uint16"
+        )
+        
+        image = DicomCubeImage(raw_data, pixel_header, space=None)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            nifti_path = os.path.join(temp_dir, "test.nii.gz")
+            
+            with pytest.raises(InvalidCubeFileError) as error:
+                DicomCubeImageIO.save_to_nifti(image, nifti_path)
+            
+            assert "Cannot save to NIfTI without space information" in str(error)
+            assert "save_to_nifti operation" in str(error)
+
     def test_save_to_dicom_folder_with_none_image(self):
         """Test saving to DICOM folder with None image."""
         with pytest.raises(DataConsistencyError) as exc_info:

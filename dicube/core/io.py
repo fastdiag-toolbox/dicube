@@ -16,7 +16,7 @@ from ..dicom import (
 )
 from ..dicom.dicom_io import save_to_dicom_folder
 from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
-from ..storage.pixel_utils import derive_pixel_header_from_array
+from ..storage.pixel_utils import derive_pixel_header_from_array, determine_optimal_nifti_dtype
 from .pixel_header import PixelDataHeader
 
 from ..validation import (
@@ -347,3 +347,56 @@ class DicomCubeImageIO:
             pixel_header=image.pixel_header,
             output_dir=folder_path,
         ) 
+        
+    @staticmethod
+    def save_to_nifti(
+        image: 'DicomCubeImage',
+        file_path: str,
+    ) -> None:
+        """Save DicomCubeImage as a NIfTI file.
+        
+        Args:
+            image (DicomCubeImage): The DicomCubeImage object to save.
+            file_path (str): Output file path.
+            
+        Raises:
+            ImportError: When nibabel is not installed.
+            InvalidCubeFileError: When saving fails.
+        """
+        # Validate required parameters
+        validate_not_none(image, "image", "save_to_nifti operation", DataConsistencyError)
+        validate_string_not_empty(file_path, "file_path", "save_to_nifti operation", InvalidCubeFileError)
+        
+        try:
+            import nibabel as nib
+        except ImportError:
+            raise ImportError("nibabel is required to write NIfTI files")
+        
+        try:
+            if image.space is None:
+                raise InvalidCubeFileError(
+                    "Cannot save to NIfTI without space information",
+                    context="save_to_nifti operation",
+                    suggestion="Ensure the DicomCubeImage has valid space information"
+                )
+            
+            # Get affine matrix from space
+            affine = image.space.to_nifti_affine()
+            
+            # 根据像素数据和metadata确定最佳的数据类型
+            optimal_data, dtype_name = determine_optimal_nifti_dtype(image.raw_image, image.pixel_header)
+            
+            # Create NIfTI image with optimized data type
+            nii = nib.Nifti1Image(optimal_data, affine)
+            
+            # Save to file
+            nib.save(nii, file_path)
+        except Exception as e:
+            if isinstance(e, (ImportError, InvalidCubeFileError)):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to save NIfTI file: {str(e)}",
+                context="save_to_nifti operation",
+                details={"file_path": file_path},
+                suggestion="Check file permissions and ensure space information is valid"
+            ) from e 
