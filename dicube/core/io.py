@@ -178,7 +178,6 @@ class DicomCubeImageIO:
     def load_from_dicom_folder(
         folder_path: str,
         sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
-        **kwargs
     ) -> 'DicomCubeImage':
         """Load DicomCubeImage from a DICOM folder.
         
@@ -186,7 +185,6 @@ class DicomCubeImageIO:
             folder_path (str): Path to the DICOM folder.
             sort_method (SortMethod): Method to sort DICOM files. 
                                       Defaults to SortMethod.INSTANCE_NUMBER_ASC.
-            **kwargs: Additional parameters.
             
         Returns:
             DicomCubeImage: The object created from the DICOM folder.
@@ -280,12 +278,11 @@ class DicomCubeImageIO:
             ) from e
     
     @staticmethod
-    def load_from_nifti(file_path: str, **kwargs) -> 'DicomCubeImage':
+    def load_from_nifti(file_path: str) -> 'DicomCubeImage':
         """Load DicomCubeImage from a NIfTI file.
         
         Args:
             file_path (str): Path to the NIfTI file.
-            **kwargs: Additional parameters.
             
         Returns:
             DicomCubeImage: The object created from the NIfTI file.

@@ -95,7 +95,6 @@ def save(
 def load_from_dicom_folder(
     folder_path: str,
     sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
-    **kwargs
 ) -> DicomCubeImage:
     """Load a DicomCubeImage from a DICOM folder.
     
@@ -108,10 +107,10 @@ def load_from_dicom_folder(
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load_from_dicom_folder(folder_path, sort_method, **kwargs)
+    return DicomCubeImageIO.load_from_dicom_folder(folder_path, sort_method)
 
 
-def load_from_nifti(file_path: str, **kwargs) -> DicomCubeImage:
+def load_from_nifti(file_path: str) -> DicomCubeImage:
     """Load a DicomCubeImage from a NIfTI file.
     
     Args:
@@ -121,20 +120,18 @@ def load_from_nifti(file_path: str, **kwargs) -> DicomCubeImage:
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load_from_nifti(file_path, **kwargs)
+    return DicomCubeImageIO.load_from_nifti(file_path)
 
 
 def save_to_dicom_folder(
     image: DicomCubeImage,
     folder_path: str,
-    **kwargs
 ) -> None:
     """Save a DicomCubeImage as a DICOM folder.
     
     Args:
         image (DicomCubeImage): The image object to save.
         folder_path (str): Output directory path.
-        **kwargs: Additional parameters.
     """
     return DicomCubeImageIO.save_to_dicom_folder(image, folder_path)
 
