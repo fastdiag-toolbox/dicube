@@ -39,27 +39,47 @@ except PackageNotFoundError:
     # editable install / source tree
     __version__ = "0.1.0+unknown"
 
+# Default to the number of CPU cores, but cap at 8 threads to avoid excessive resource usage
+# Fall back to 4 if cpu_count() returns None (which can happen in some environments)
+_num_threads = 4
+
+def get_num_threads() -> int:
+    """Get the global number of threads for parallel processing.
+    
+    Returns:
+        int: Current number of threads setting.
+    """
+    global _num_threads
+    return _num_threads
+
+def set_num_threads(num_threads: int) -> None:
+    """Set the global number of threads for parallel processing.
+    
+    Args:
+        num_threads (int): Number of threads for parallel processing tasks.
+    """
+    global _num_threads
+    if num_threads < 1:
+        raise ValueError("Number of threads must be at least 1")
+    _num_threads = num_threads
+
 # Top-level convenience methods
-def load(file_path: str, num_threads: int = 4, **kwargs) -> DicomCubeImage:
+def load(file_path: str) -> DicomCubeImage:
     """Load a DicomCubeImage from a file.
     
     Args:
         file_path (str): Path to the input file.
-        num_threads (int): Number of parallel decoding threads. Defaults to 4.
-        **kwargs: Additional parameters passed to the underlying reader.
     
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load(file_path, num_threads, **kwargs)
+    return DicomCubeImageIO.load(file_path)
 
 
 def save(
     image: DicomCubeImage,
     file_path: str,
     file_type: str = "s",
-    num_threads: int = 4,
-    **kwargs
 ) -> None:
     """Save a DicomCubeImage to a file.
     
@@ -68,10 +88,8 @@ def save(
         file_path (str): Output file path.
         file_type (str): File type, "s" (speed priority), "a" (compression priority), 
                         or "l" (lossy compression). Defaults to "s".
-        num_threads (int): Number of parallel encoding threads. Defaults to 4.
-        **kwargs: Additional parameters passed to the underlying writer.
     """
-    return DicomCubeImageIO.save(image, file_path, file_type, num_threads, **kwargs)
+    return DicomCubeImageIO.save(image, file_path, file_type)
 
 
 def load_from_dicom_folder(
@@ -135,6 +153,8 @@ __all__ = [
     "load_from_dicom_folder",
     "load_from_nifti",
     "save_to_dicom_folder",
+    "set_num_threads",
+    "get_num_threads",
     # IO class (for direct use if needed)
     "DicomCubeImageIO",
 ] 

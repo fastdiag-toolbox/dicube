@@ -52,7 +52,6 @@ class DicomCubeImageIO:
         image: "DicomCubeImage",
         file_path: str,
         file_type: str = "s",
-        num_threads: int = 4,
     ) -> None:
         """Save DicomCubeImage to a file.
         
@@ -61,7 +60,6 @@ class DicomCubeImageIO:
             file_path (str): Output file path.
             file_type (str): File type, "s" (speed priority), "a" (compression priority), 
                              or "l" (lossy compression). Defaults to "s".
-            num_threads (int): Number of parallel encoding threads. Defaults to 4.
             
         Raises:
             InvalidCubeFileError: If the file_type is not supported.
@@ -69,7 +67,6 @@ class DicomCubeImageIO:
         # Validate required parameters
         validate_not_none(image, "image", "save operation", DataConsistencyError)
         validate_string_not_empty(file_path, "file_path", "save operation", InvalidCubeFileError)
-        validate_numeric_range(num_threads, "num_threads", min_value=1, context="save operation")
         
         # Validate file_type parameter
         if file_type not in ("s", "a", "l"):
@@ -99,8 +96,7 @@ class DicomCubeImageIO:
                 pixel_header=image.pixel_header,
                 dicom_meta=image.dicom_meta,
                 space=image.space,
-                num_threads=num_threads,
-                dicom_status=image.dicom_status
+                dicom_status=image.dicom_status,
             )
         except Exception as e:
             if isinstance(e, (InvalidCubeFileError, CodecError)):
@@ -112,13 +108,11 @@ class DicomCubeImageIO:
             ) from e
     
     @staticmethod
-    def load(file_path: str, num_threads: int = 4, **kwargs) -> 'DicomCubeImage':
+    def load(file_path: str) -> 'DicomCubeImage':
         """Load DicomCubeImage from a file.
         
         Args:
             file_path (str): Input file path.
-            num_threads (int): Number of parallel decoding threads. Defaults to 4.
-            **kwargs: Additional parameters passed to the underlying reader.
             
         Returns:
             DicomCubeImage: The loaded object from the file.
@@ -156,7 +150,7 @@ class DicomCubeImageIO:
             pixel_header = reader.read_pixel_header()
             dicom_status = reader.read_dicom_status()
             
-            images = reader.read_images(num_threads=num_threads)
+            images = reader.read_images()
             if isinstance(images, list):
                 # Convert list to ndarray if needed
                 images = np.stack(images)

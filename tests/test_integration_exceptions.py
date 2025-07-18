@@ -75,18 +75,6 @@ class TestFileIOIntegration:
         assert "cannot be None" in str(error)
         assert "save operation" in str(error)
     
-    def test_save_with_invalid_num_threads(self):
-        """Test saving with invalid num_threads."""
-        raw_image = np.array([[1, 2], [3, 4]])
-        pixel_header = Mock(spec=PixelDataHeader)
-        image = DicomCubeImage(raw_image, pixel_header)
-        
-        with pytest.raises(DataConsistencyError) as exc_info:
-            DicomCubeImageIO.save(image, "test.dcb", num_threads=0)
-        
-        error = exc_info.value
-        assert "num_threads" in str(error)
-        assert "below minimum value" in str(error)
     
     def test_load_from_nonexistent_dicom_folder(self):
         """Test loading from non-existent DICOM folder."""

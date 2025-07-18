@@ -313,17 +313,20 @@ class DcbFile:
             'pixel_header_bin': pixel_header_bin
         }
     
-    def _encode_frames(self, images: List, num_threads: int = 4):
+    def _encode_frames(self, images: List):
         """Encode frames using parallel or serial processing.
         
         Args:
             images (List): List of frames to encode.
-            num_threads (int): Number of worker threads for parallel encoding.
             
         Returns:
             List[bytes]: List of encoded frame data.
         """
-        if num_threads is not None and num_threads > 1:
+        # Import get_num_threads function to avoid circular import
+        from .. import get_num_threads
+        num_threads = get_num_threads()
+        
+        if num_threads > 1:
             # Parallel encoding
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 encoded_blobs = list(
@@ -426,7 +429,6 @@ class DcbFile:
         dicom_meta: Optional[DicomMeta] = None,
         dicom_status: DicomStatus = DicomStatus.CONSISTENT,
         space: Optional[Space] = None,
-        num_threads: int = 4,
     ):
         """Write image data and metadata to a DCB file.
 
@@ -440,7 +442,6 @@ class DcbFile:
             dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
             dicom_status (DicomStatus): DICOM status enumeration. Defaults to DicomStatus.CONSISTENT.
             space (Space, optional): Spatial information. Defaults to None.
-            num_threads (int): Number of worker threads for parallel encoding. Defaults to 4.
         """
         if images is None:
             images = []
@@ -452,7 +453,7 @@ class DcbFile:
         )
         
         # Encode frames
-        encoded_frames = self._encode_frames(images, num_threads)
+        encoded_frames = self._encode_frames(images)
 
         # Write file structure
         header_size = struct.calcsize(self.HEADER_STRUCT)
@@ -576,20 +577,19 @@ class DcbFile:
         pixel_header_json = pixel_header_bin.decode("utf-8")
         return HeaderClass.from_json(pixel_header_json)
 
-    def read_images(self, num_threads: int = 4):
+    def read_images(self):
         """Read all image frames from the file.
-
-        Args:
-            num_threads (int): Number of worker threads for parallel decoding.
-                Defaults to 4.
-
+            
         Returns:
             List[np.ndarray] or np.ndarray: The decoded image frames. If the number of frames is 1,
                 returns a single numpy array, otherwise returns a list of arrays.
         """
+        # Import get_num_threads function to avoid circular import
+        from .. import get_num_threads
+        
         hdr = self.header
         frame_count = hdr["frame_count"]
-
+        
         if frame_count == 0:
             # No frames to read
             pixel_header = self.read_pixel_header()
@@ -600,18 +600,18 @@ class DcbFile:
         frame_offsets_length = hdr["frame_offsets_length"]
         frame_lengths_offset = hdr["frame_lengths_offset"]
         frame_lengths_length = hdr["frame_lengths_length"]
-
+        
         with open(self.filename, "rb") as f:
             # Read frame offsets
             f.seek(frame_offsets_offset)
             frame_offsets_bin = f.read(frame_offsets_length)
             frame_offsets = struct.unpack(f"<{frame_count}Q", frame_offsets_bin)
-
+            
             # Read frame lengths
             f.seek(frame_lengths_offset)
             frame_lengths_bin = f.read(frame_lengths_length)
             frame_lengths = struct.unpack(f"<{frame_count}Q", frame_lengths_bin)
-
+            
             # Read each frame data
             frame_data_list = []
             for offset, length in zip(frame_offsets, frame_lengths):
@@ -626,8 +626,9 @@ class DcbFile:
 
         # Decode frames (with parallelization if needed)
         frames = []
-
-        if num_threads is not None and num_threads > 1 and frame_count > 1:
+        
+        num_threads = get_num_threads()
+        if num_threads > 1 and frame_count > 1:
             # Parallel decoding
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 frames = list(
