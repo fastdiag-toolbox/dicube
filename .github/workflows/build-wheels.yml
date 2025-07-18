@@ -25,6 +25,13 @@ jobs:
           # Ensure full history to prevent setuptools_scm issues
           fetch-depth: 0
 
+      # Set up QEMU for cross-platform builds (Linux only)
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
       # For Windows, we need to manually install pip
       - name: Set up Windows environment
         if: runner.os == 'Windows'
