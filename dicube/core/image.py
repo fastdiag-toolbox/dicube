@@ -12,6 +12,16 @@ from ..dicom import (
 from .pixel_header import PixelDataHeader
 from ..storage.pixel_utils import get_float_data
 from spacetransformer import Space
+from ..validation import (
+    validate_not_none,
+    validate_parameter_type,
+    validate_array_shape,
+    validate_string_not_empty
+)
+from ..exceptions import (
+    DataConsistencyError,
+    MetaDataError
+)
 
 
 class DicomCubeImage:
@@ -44,11 +54,17 @@ class DicomCubeImage:
             dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
             space (Space, optional): Spatial information. Defaults to None.
         """
-        # Validate required parameters
-        if raw_image is None:
-            raise ValueError("raw_image cannot be None in DicomCubeImage constructor")
-        if pixel_header is None:
-            raise ValueError("pixel_header cannot be None in DicomCubeImage constructor")
+        # Validate required parameters using validation utilities
+        validate_not_none(raw_image, "raw_image", "DicomCubeImage constructor", DataConsistencyError)
+        validate_not_none(pixel_header, "pixel_header", "DicomCubeImage constructor", DataConsistencyError)
+        validate_array_shape(raw_image, min_dims=2, name="raw_image", context="DicomCubeImage constructor")
+        validate_parameter_type(pixel_header, PixelDataHeader, "pixel_header", "DicomCubeImage constructor", DataConsistencyError)
+        
+        # Validate optional parameters if provided
+        if dicom_meta is not None:
+            validate_parameter_type(dicom_meta, DicomMeta, "dicom_meta", "DicomCubeImage constructor", MetaDataError)
+        if space is not None:
+            validate_parameter_type(space, Space, "space", "DicomCubeImage constructor", DataConsistencyError)
         
         self.raw_image = raw_image
         self.pixel_header = pixel_header
@@ -237,30 +253,49 @@ class DicomCubeImage:
         Returns:
             DicomMeta: A new DicomMeta instance with basic required fields.
         """
-        # Create empty DicomMeta
-        num_slices = self.raw_image.shape[0] if len(self.raw_image.shape) == 3 else 1
-        meta = DicomMeta({}, [f"slice_{i:04d}.dcm" for i in range(num_slices)])
+        # Validate input parameters
+        validate_string_not_empty(modality, "modality", "init_meta operation", MetaDataError)
+        validate_string_not_empty(patient_name, "patient_name", "init_meta operation", MetaDataError)
+        validate_string_not_empty(patient_id, "patient_id", "init_meta operation", MetaDataError)
+        
+        try:
+            # Create empty DicomMeta
+            num_slices = self.raw_image.shape[0] if len(self.raw_image.shape) == 3 else 1
+            meta = DicomMeta({}, [f"slice_{i:04d}.dcm" for i in range(num_slices)])
 
-        # Generate necessary UIDs
-        uids = self._generate_uids()
-        
-        # Set metadata sections
-        self._set_patient_info(meta, patient_name, patient_id)
-        self._set_study_info(meta, uids, modality)
-        self._set_series_info(meta, uids, modality)
-        self._set_image_info(meta, uids, num_slices)
-        self._set_space_info(meta, num_slices)
-        self._set_pixel_info(meta)
-        
-        # Set modality
-        meta.set_shared_item(CommonTags.Modality, modality)
+            # Generate necessary UIDs
+            uids = self._generate_uids()
+            
+            # Set metadata sections
+            self._set_patient_info(meta, patient_name, patient_id)
+            self._set_study_info(meta, uids, modality)
+            self._set_series_info(meta, uids, modality)
+            self._set_image_info(meta, uids, num_slices)
+            self._set_space_info(meta, num_slices)
+            self._set_pixel_info(meta)
+            
+            # Set modality
+            meta.set_shared_item(CommonTags.Modality, modality)
 
-        # Validate initialization success
-        if meta is None:
-            raise RuntimeError("DicomMeta initialization failed in init_meta operation")
-        
-        self.dicom_meta = meta
-        return meta
+            # Validate initialization success
+            if meta is None:
+                raise MetaDataError(
+                    "DicomMeta initialization returned None",
+                    context="init_meta operation",
+                    suggestion="Check DicomMeta constructor parameters and dependencies"
+                )
+            
+            self.dicom_meta = meta
+            return meta
+            
+        except Exception as e:
+            if isinstance(e, MetaDataError):
+                raise
+            raise MetaDataError(
+                f"Failed to initialize DicomMeta: {str(e)}",
+                context="init_meta operation",
+                suggestion="Verify image data and metadata parameters are valid"
+            ) from e
 
     @property
     def shape(self):
@@ -286,13 +321,20 @@ class DicomCubeImage:
         Both raw_image and space are now in (z,y,x) format internally.
 
         Raises:
-            ValueError: If space shape doesn't match image dimensions.
+            DataConsistencyError: If space shape doesn't match image dimensions.
         """
         if self.space and self.raw_image.ndim >= 3:
             expected_shape = tuple(self.space.shape)
             if self.raw_image.shape[-len(expected_shape) :] != expected_shape:
-                raise ValueError(
-                    f"Space shape {expected_shape} mismatch with image {self.raw_image.shape}"
+                raise DataConsistencyError(
+                    f"Space shape mismatch with image dimensions",
+                    context="DicomCubeImage shape validation",
+                    details={
+                        "space_shape": expected_shape,
+                        "image_shape": self.raw_image.shape,
+                        "image_dims": self.raw_image.ndim
+                    },
+                    suggestion="Ensure space dimensions match the image array dimensions"
                 )
 
     def get_fdata(self, dtype="float32") -> np.ndarray:

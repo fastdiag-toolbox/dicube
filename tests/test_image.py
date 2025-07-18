@@ -219,8 +219,9 @@ def test_dicom_cube_image_space_mismatch():
         spacing=(1.0, 1.0, 1.0)
     )
     
-    # 应该抛出 ValueError
-    with pytest.raises(ValueError, match="Space shape .* mismatch with image"):
+    # 应该抛出 DataConsistencyError
+    from dicube.exceptions import DataConsistencyError
+    with pytest.raises(DataConsistencyError, match="Space shape mismatch with image"):
         DicomCubeImage(raw_data, pixel_header, space=wrong_space)
 
 
