@@ -14,6 +14,17 @@ from ..codecs import get_codec
 from ..core.pixel_header import PixelDataHeader
 from ..dicom import DicomMeta
 from ..dicom.dicom_status import DicomStatus
+from ..validation import (
+    validate_not_none,
+    validate_parameter_type,
+    validate_string_not_empty
+)
+from ..exceptions import (
+    InvalidCubeFileError,
+    CodecError,
+    MetaDataError,
+    DataConsistencyError
+)
 
 """File Format Specification for DiCube (DCB) Files
 
@@ -89,6 +100,18 @@ class DcbFile:
             filename (str): The file path.
             mode (str): "r" for reading, "w" for writing, "a" for appending.
         """
+        # Validate required parameters
+        validate_string_not_empty(filename, "filename", "DcbFile constructor", InvalidCubeFileError)
+        validate_parameter_type(mode, str, "mode", "DcbFile constructor", InvalidCubeFileError)
+        
+        if mode not in ("r", "w", "a"):
+            raise InvalidCubeFileError(
+                f"Invalid file mode: {mode}",
+                context="DcbFile constructor",
+                details={"mode": mode, "supported_modes": ["r", "w", "a"]},
+                suggestion="Use 'r' for reading, 'w' for writing, or 'a' for appending"
+            )
+        
         self.filename = filename
         self.mode = mode
         self._header = None  # Delay reading header until needed
@@ -98,16 +121,30 @@ class DcbFile:
 
     def _read_header_and_check_type(self):
         """Read file header and determine the correct subclass."""
-        hdr = self.read_header(verify_magic=False)  # Lazy read
-        magic = hdr["magic"]
-        version = hdr["version"]
+        try:
+            hdr = self.read_header(verify_magic=False)  # Lazy read
+            magic = hdr["magic"]
+            version = hdr["version"]
 
-        if magic != self.MAGIC:
-            if magic == DcbSFile.MAGIC and version == DcbSFile.VERSION:
-                self.__class__ = DcbSFile
-            else:
-                raise ValueError(f"Unsupported file format, magic number: {magic}")
-        self.VERSION = version
+            if magic != self.MAGIC:
+                if magic == DcbSFile.MAGIC and version == DcbSFile.VERSION:
+                    self.__class__ = DcbSFile
+                else:
+                    raise InvalidCubeFileError(
+                        f"Unsupported file format",
+                        context="file header validation",
+                        details={"magic_number": magic, "file_path": self.filename},
+                        suggestion="Ensure the file is a valid DicomCube file"
+                    )
+            self.VERSION = version
+        except Exception as e:
+            if isinstance(e, InvalidCubeFileError):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to read file header: {str(e)}",
+                context="file header validation",
+                details={"file_path": self.filename}
+            ) from e
 
     @property
     def header(self):
@@ -130,55 +167,77 @@ class DcbFile:
             dict: Dictionary containing header fields.
 
         Raises:
-            ValueError: If the file is not a valid DicomCube file.
+            InvalidCubeFileError: If the file is not a valid DicomCube file.
         """
         if self._header:
             return self._header
 
-        header_size = struct.calcsize(self.HEADER_STRUCT)
-        with open(self.filename, "rb") as f:
-            header_data = f.read(header_size)
+        try:
+            header_size = struct.calcsize(self.HEADER_STRUCT)
+            with open(self.filename, "rb") as f:
+                header_data = f.read(header_size)
 
-        unpacked = struct.unpack(self.HEADER_STRUCT, header_data)
-        (
-            magic,
-            version,
-            dicom_status_offset,
-            dicom_status_length,
-            dicommeta_offset,
-            dicommeta_length,
-            space_offset,
-            space_length,
-            pixel_header_offset,
-            pixel_header_length,
-            frame_offsets_offset,
-            frame_offsets_length,
-            frame_lengths_offset,
-            frame_lengths_length,
-            frame_count,
-        ) = unpacked
+            if len(header_data) < header_size:
+                raise InvalidCubeFileError(
+                    f"File too small to contain valid header",
+                    context="read_header operation",
+                    details={"expected_size": header_size, "actual_size": len(header_data)},
+                    suggestion="Ensure the file is a complete DicomCube file"
+                )
 
-        if verify_magic and magic != self.MAGIC:
-            raise ValueError("Not a valid DicomCube file.")
+            unpacked = struct.unpack(self.HEADER_STRUCT, header_data)
+            (
+                magic,
+                version,
+                dicom_status_offset,
+                dicom_status_length,
+                dicommeta_offset,
+                dicommeta_length,
+                space_offset,
+                space_length,
+                pixel_header_offset,
+                pixel_header_length,
+                frame_offsets_offset,
+                frame_offsets_length,
+                frame_lengths_offset,
+                frame_lengths_length,
+                frame_count,
+            ) = unpacked
 
-        self._header = {
-            "magic": magic,
-            "version": version,
-            "dicom_status_offset": dicom_status_offset,
-            "dicom_status_length": dicom_status_length,
-            "dicommeta_offset": dicommeta_offset,
-            "dicommeta_length": dicommeta_length,
-            "space_offset": space_offset,
-            "space_length": space_length,
-            "pixel_header_offset": pixel_header_offset,
-            "pixel_header_length": pixel_header_length,
-            "frame_offsets_offset": frame_offsets_offset,
-            "frame_offsets_length": frame_offsets_length,
-            "frame_lengths_offset": frame_lengths_offset,
-            "frame_lengths_length": frame_lengths_length,
-            "frame_count": frame_count,
-        }
-        return self._header
+            if verify_magic and magic != self.MAGIC:
+                raise InvalidCubeFileError(
+                    f"Invalid file format magic number",
+                    context="read_header operation",
+                    details={"expected_magic": self.MAGIC, "actual_magic": magic},
+                    suggestion="Ensure the file is a valid DicomCube file"
+                )
+
+            self._header = {
+                "magic": magic,
+                "version": version,
+                "dicom_status_offset": dicom_status_offset,
+                "dicom_status_length": dicom_status_length,
+                "dicommeta_offset": dicommeta_offset,
+                "dicommeta_length": dicommeta_length,
+                "space_offset": space_offset,
+                "space_length": space_length,
+                "pixel_header_offset": pixel_header_offset,
+                "pixel_header_length": pixel_header_length,
+                "frame_offsets_offset": frame_offsets_offset,
+                "frame_offsets_length": frame_offsets_length,
+                "frame_lengths_offset": frame_lengths_offset,
+                "frame_lengths_length": frame_lengths_length,
+                "frame_count": frame_count,
+            }
+            return self._header
+        except Exception as e:
+            if isinstance(e, InvalidCubeFileError):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to read file header: {str(e)}",
+                context="read_header operation",
+                details={"file_path": self.filename}
+            ) from e
 
     def _prepare_metadata(
         self, 
@@ -671,9 +730,19 @@ class DcbSFile(DcbFile):
 
         Returns:
             bytes: The encoded frame data.
+        
+        Raises:
+            CodecError: If encoding fails.
         """
-        codec = get_codec(self.CODEC_NAME)
-        return codec.encode_lossless(frame_data)
+        try:
+            codec = get_codec(self.CODEC_NAME)
+            return codec.encode_lossless(frame_data)
+        except Exception as e:
+            raise CodecError(
+                f"Failed to encode frame using {self.CODEC_NAME} codec: {str(e)}",
+                context="frame encoding operation",
+                details={"codec_name": self.CODEC_NAME, "frame_shape": frame_data.shape if hasattr(frame_data, 'shape') else None}
+            ) from e
 
     def _decode_one_frame(self, bytes) -> np.ndarray:
         """Decode a single frame using the HTJ2K codec.
@@ -683,9 +752,19 @@ class DcbSFile(DcbFile):
 
         Returns:
             np.ndarray: The decoded frame data.
+        
+        Raises:
+            CodecError: If decoding fails.
         """
-        codec = get_codec(self.CODEC_NAME)
-        return codec.decode(bytes)
+        try:
+            codec = get_codec(self.CODEC_NAME)
+            return codec.decode(bytes)
+        except Exception as e:
+            raise CodecError(
+                f"Failed to decode frame using {self.CODEC_NAME} codec: {str(e)}",
+                context="frame decoding operation",
+                details={"codec_name": self.CODEC_NAME, "data_size": len(bytes) if bytes else 0}
+            ) from e
 
 
 class DcbAFile(DcbFile):
