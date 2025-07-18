@@ -86,12 +86,14 @@ class DcbFile:
         MAGIC (bytes): Magic bytes for file identification.
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID.
+        FILE_EXTENSION (str): File extension for this format.
     """
 
     HEADER_STRUCT = "<8sI13Q"
     MAGIC = b"DCMCUBE\x00"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # Base class has no specific transfer syntax
+    FILE_EXTENSION = ".dcb"  # Default extension
 
     def __init__(self, filename: str, mode: str = "r"):
         """Initialize a DCB file object.
@@ -112,12 +114,29 @@ class DcbFile:
                 suggestion="Use 'r' for reading, 'w' for writing, or 'a' for appending"
             )
         
+        # For write mode, ensure filename has correct extension
+        if mode == "w":
+            filename = self._ensure_correct_extension(filename)
+        
         self.filename = filename
         self.mode = mode
         self._header = None  # Delay reading header until needed
 
         if os.path.exists(filename) and mode in ("r", "a"):
             self._read_header_and_check_type()
+
+    def _ensure_correct_extension(self, filename: str) -> str:
+        """Ensure the filename has the correct extension for this file type.
+        
+        Args:
+            filename (str): The original filename.
+            
+        Returns:
+            str: The filename with correct extension.
+        """
+        if not filename.endswith(self.FILE_EXTENSION):
+            return filename + self.FILE_EXTENSION
+        return filename
 
     def _read_header_and_check_type(self):
         """Read file header and determine the correct subclass."""
@@ -715,12 +734,14 @@ class DcbSFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str): DICOM transfer syntax UID for HTJ2K Lossless.
         CODEC_NAME (str): Codec name used for compression.
+        FILE_EXTENSION (str): File extension for speed-optimized format.
     """
 
     MAGIC = b"DCMCUBES"
     VERSION = 1
     TRANSFER_SYNTAX_UID = "1.2.840.10008.1.2.4.201"  # HTJ2K Lossless
     CODEC_NAME = "jph"
+    FILE_EXTENSION = ".dcbs"
 
     def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
         """Encode a single frame using the HTJ2K codec.
@@ -778,12 +799,14 @@ class DcbAFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID, set when codec is selected.
         CODEC_NAME (str, optional): Codec name, set when codec is selected.
+        FILE_EXTENSION (str): File extension for archive-optimized format.
     """
 
     MAGIC = b"DCMCUBEA"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
     CODEC_NAME = None  # To be defined when codec is selected
+    FILE_EXTENSION = ".dcba"
 
 
 class DcbLFile(DcbFile):
@@ -797,9 +820,11 @@ class DcbLFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID, set when codec is selected.
         CODEC_NAME (str, optional): Codec name, set when codec is selected.
+        FILE_EXTENSION (str): File extension for lossy compression format.
     """
 
     MAGIC = b"DCMCUBEL"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
     CODEC_NAME = None  # To be defined when codec is selected
+    FILE_EXTENSION = ".dcbl"

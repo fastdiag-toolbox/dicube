@@ -82,12 +82,16 @@ class DicomCubeImageIO:
         
         try:
             # Choose appropriate writer based on file type
+            # The writer will automatically ensure correct file extension
             if file_type == "s":
                 writer = DcbSFile(file_path, mode="w")
             elif file_type == "a":
                 writer = DcbAFile(file_path, mode="w")
             elif file_type == "l":
                 writer = DcbLFile(file_path, mode="w")
+            
+            # Update file_path to the corrected path from writer
+            file_path = writer.filename
             
             # Write to file
             writer.write(
