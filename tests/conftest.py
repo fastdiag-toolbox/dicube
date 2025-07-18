@@ -44,12 +44,12 @@ def dummy_space():
 def dummy_pixel_header():
     """一个简单的 PixelDataHeader 示例"""
     header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint8",
-        WINDOW_CENTER=40,
-        WINDOW_WIDTH=400,
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint8",
+        WindowCenter=40,
+        WindowWidth=400,
     )
     return header
 

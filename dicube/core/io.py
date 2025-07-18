@@ -250,12 +250,12 @@ class DicomCubeImageIO:
             
             # Create pixel_header
             pixel_header = PixelDataHeader(
-                RESCALE_SLOPE=float(slope) if slope is not None else 1.0,
-                RESCALE_INTERCEPT=float(intercept) if intercept is not None else 0.0,
-                ORIGINAL_PIXEL_DTYPE=str(images[0].dtype),
-                PIXEL_DTYPE=str(images[0].dtype),
-                WINDOW_CENTER=float(wind_center) if wind_center is not None else None,
-                WINDOW_WIDTH=float(wind_width) if wind_width is not None else None,
+                RescaleSlope=float(slope) if slope is not None else 1.0,
+                RescaleIntercept=float(intercept) if intercept is not None else 0.0,
+                OriginalPixelDtype=str(images[0].dtype),
+                PixelDtype=str(images[0].dtype),
+                WindowCenter=float(wind_center) if wind_center is not None else None,
+                WindowWidth=float(wind_width) if wind_width is not None else None,
             )
             
             # Validate PixelDataHeader initialization success

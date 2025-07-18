@@ -86,8 +86,8 @@ def create_dicom_dataset(meta_dict: dict, pixel_header):
 
     ds.file_meta = create_file_meta(ds)
     ensure_required_tags(ds)
-    ds.RescaleSlope = pixel_header.RESCALE_SLOPE
-    ds.RescaleIntercept = pixel_header.RESCALE_INTERCEPT
+    ds.RescaleSlope = pixel_header.RescaleSlope
+    ds.RescaleIntercept = pixel_header.RescaleIntercept
 
     return ds
 

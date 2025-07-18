@@ -31,37 +31,37 @@ def derive_pixel_header_from_array(
     dtype = str(image.dtype)
     if image.dtype in (np.uint16, np.uint8, np.uint32):
         return image, PixelDataHeader(
-            RESCALE_SLOPE=1,
-            RESCALE_INTERCEPT=0,
-            PIXEL_DTYPE=dtype,
-            ORIGINAL_PIXEL_DTYPE=dtype,
+            RescaleSlope=1,
+            RescaleIntercept=0,
+            PixelDtype=dtype,
+            OriginalPixelDtype=dtype,
         )
     elif image.dtype == np.int16:
         min_val = int(np.min(image))
         image = (image - min_val).astype("uint16")
         return image, PixelDataHeader(
-            RESCALE_SLOPE=1,
-            RESCALE_INTERCEPT=min_val,
-            PIXEL_DTYPE="uint16",
-            ORIGINAL_PIXEL_DTYPE=dtype,
+            RescaleSlope=1,
+            RescaleIntercept=min_val,
+            PixelDtype="uint16",
+            OriginalPixelDtype=dtype,
         )
     elif image.dtype == np.int8:
         min_val = int(np.min(image))
         image = (image - min_val).astype("uint8")
         return image, PixelDataHeader(
-            RESCALE_SLOPE=1,
-            RESCALE_INTERCEPT=min_val,
-            PIXEL_DTYPE="uint8",
-            ORIGINAL_PIXEL_DTYPE=dtype,
+            RescaleSlope=1,
+            RescaleIntercept=min_val,
+            PixelDtype="uint8",
+            OriginalPixelDtype=dtype,
         )
     elif image.dtype == np.int32:
         min_val = int(np.min(image))
         image = (image - min_val).astype("uint32")
         return image, PixelDataHeader(
-            RESCALE_SLOPE=1,
-            RESCALE_INTERCEPT=min_val,
-            PIXEL_DTYPE="uint32",
-            ORIGINAL_PIXEL_DTYPE=dtype,
+            RescaleSlope=1,
+            RescaleIntercept=min_val,
+            PixelDtype="uint32",
+            OriginalPixelDtype=dtype,
         )
     elif image.dtype in (np.float16, np.float32, np.float64):
         if preferred_dtype == "uint8":
@@ -78,10 +78,10 @@ def derive_pixel_header_from_array(
             # Set all pixels to 0, slope=0, intercept=min_val
             # When reading back: i*slope+intercept = min_val
             header = PixelDataHeader(
-                RESCALE_SLOPE=1.0,
-                RESCALE_INTERCEPT=float(min_val),
-                PIXEL_DTYPE=preferred_dtype,
-                ORIGINAL_PIXEL_DTYPE=dtype,
+                RescaleSlope=1.0,
+                RescaleIntercept=float(min_val),
+                PixelDtype=preferred_dtype,
+                OriginalPixelDtype=dtype,
             )
             raw_image = np.zeros_like(image, dtype=preferred_dtype)
             return raw_image, header
@@ -92,12 +92,12 @@ def derive_pixel_header_from_array(
                 preferred_dtype
             )
             header = PixelDataHeader(
-                RESCALE_SLOPE=slope,
-                RESCALE_INTERCEPT=intercept,
-                PIXEL_DTYPE=preferred_dtype,
-                ORIGINAL_PIXEL_DTYPE=dtype,
-                MAX_VAL=max_val,
-                MIN_VAL=min_val,
+                RescaleSlope=slope,
+                RescaleIntercept=intercept,
+                PixelDtype=preferred_dtype,
+                OriginalPixelDtype=dtype,
+                MaxVal=max_val,
+                MinVal=min_val,
             )
             return raw_image, header
     else:
@@ -132,10 +132,10 @@ def get_float_data(
 
     # Note: Output may be positive or negative depending on original dtype and slope/intercept
     output_img = raw_image.astype(dtype)
-    if pixel_header.RESCALE_SLOPE is not None:
-        slope = np.array(pixel_header.RESCALE_SLOPE).astype(dtype)
+    if pixel_header.RescaleSlope is not None:
+        slope = np.array(pixel_header.RescaleSlope).astype(dtype)
         output_img *= slope
-    if pixel_header.RESCALE_INTERCEPT is not None:
-        intercept = np.array(pixel_header.RESCALE_INTERCEPT).astype(dtype)
+    if pixel_header.RescaleIntercept is not None:
+        intercept = np.array(pixel_header.RescaleIntercept).astype(dtype)
         output_img += intercept
     return output_img 

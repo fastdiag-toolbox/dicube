@@ -198,8 +198,8 @@ class DcbStreamingReader:
         
         # 5. Set pixel-related attributes
         if self.pixel_header:
-            ds.RescaleSlope = self.pixel_header.RESCALE_SLOPE
-            ds.RescaleIntercept = self.pixel_header.RESCALE_INTERCEPT
+            ds.RescaleSlope = self.pixel_header.RescaleSlope
+            ds.RescaleIntercept = self.pixel_header.RescaleIntercept
         
         # 6. Set pixel data (using encapsulated format for compressed data)
         ds.PixelData = encapsulate([encoded_data])

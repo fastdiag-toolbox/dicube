@@ -226,13 +226,13 @@ class DicomCubeImage:
         meta.set_shared_item(CommonTags.PixelRepresentation, 0)
 
         # Rescale Information from pixel_header
-        if self.pixel_header.RESCALE_SLOPE is not None:
+        if self.pixel_header.RescaleSlope is not None:
             meta.set_shared_item(
-                CommonTags.RescaleSlope, float(self.pixel_header.RESCALE_SLOPE)
+                CommonTags.RescaleSlope, float(self.pixel_header.RescaleSlope)
             )
-        if self.pixel_header.RESCALE_INTERCEPT is not None:
+        if self.pixel_header.RescaleIntercept is not None:
             meta.set_shared_item(
-                CommonTags.RescaleIntercept, float(self.pixel_header.RESCALE_INTERCEPT)
+                CommonTags.RescaleIntercept, float(self.pixel_header.RescaleIntercept)
             )
 
     def init_meta(

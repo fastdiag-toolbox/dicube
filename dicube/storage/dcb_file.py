@@ -593,7 +593,7 @@ class DcbFile:
         if frame_count == 0:
             # No frames to read
             pixel_header = self.read_pixel_header()
-            return np.array([], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE)
+            return np.array([], dtype=pixel_header.OriginalPixelDtype)
 
         # Read frame offsets and lengths
         frame_offsets_offset = hdr["frame_offsets_offset"]
@@ -649,7 +649,7 @@ class DcbFile:
         if len(frames) == 0:
             # Return empty array if no frames were decoded
             pixel_header = self.read_pixel_header()
-            return np.array([], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE)
+            return np.array([], dtype=pixel_header.OriginalPixelDtype)
         elif len(frames) == 1:
             # Return single frame directly
             return frames[0]
@@ -658,36 +658,32 @@ class DcbFile:
             return frames
 
     def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
-        """Encode a single frame of image data.
-
-        This is a placeholder method to be implemented by subclasses.
+        """Encode a single frame to bytes.
+        
+        Default implementation returns empty bytes.
+        Subclasses should override this method to implement specific encoding.
 
         Args:
-            frame_data (np.ndarray): The frame data to encode.
-
+            frame_data (np.ndarray): The image frame to encode.
+            
         Returns:
             bytes: The encoded frame data.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
         """
-        raise NotImplementedError("Subclass must implement _encode_one_frame")
+        return np.array([], dtype=self.pixel_header.OriginalPixelDtype)
 
     def _decode_one_frame(self, bytes) -> np.ndarray:
-        """Decode a single frame of image data.
-
-        This is a placeholder method to be implemented by subclasses.
+        """Decode a single frame from bytes.
+        
+        Default implementation returns an empty array with the correct data type.
+        Subclasses should override this method to implement specific decoding.
 
         Args:
             bytes (bytes): The encoded frame data.
 
         Returns:
-            np.ndarray: The decoded frame data.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
+            np.ndarray: The decoded image frame.
         """
-        raise NotImplementedError("Subclass must implement _decode_one_frame")
+        return np.array([], dtype=self.header_data['pixel_header'].OriginalPixelDtype)
 
     def read_dicom_status(self) -> DicomStatus:
         """Read DICOM status information from the file.

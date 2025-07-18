@@ -16,10 +16,10 @@ def test_dicom_cube_image_init():
     # 构造一个 10x10x10 的 3D 图像
     raw_data = np.arange(1000).reshape(10, 10, 10).astype(np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=2.0,
-        RESCALE_INTERCEPT=-100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16",
+        RescaleSlope=2.0,
+        RescaleIntercept=-100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16",
     )
     img = DicomCubeImage(raw_data, pixel_header=pixel_header)
     assert img.raw_image.shape == (10, 10, 10)
@@ -38,12 +38,12 @@ def test_dicom_cube_image_basic_operations():
     """
     raw_data = np.random.randint(0, 1000, size=(5, 64, 64), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=-1024.0,
-        ORIGINAL_PIXEL_DTYPE="uint16", 
-        PIXEL_DTYPE="uint16",
-        WINDOW_CENTER=50.0,
-        WINDOW_WIDTH=400.0
+        RescaleSlope=1.0,
+        RescaleIntercept=-1024.0,
+        OriginalPixelDtype="uint16", 
+        PixelDtype="uint16",
+        WindowCenter=50.0,
+        WindowWidth=400.0
     )
     
     img = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -88,10 +88,10 @@ def test_dicom_cube_image_to_dicom_folder():
     # 构造一个简单的 DicomCubeImage
     raw_data = np.random.randint(0, 1000, size=(5, 128, 128), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=-1024.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=-1024.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     image = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -119,10 +119,10 @@ def test_dicom_cube_image_metadata():
     """
     raw_data = np.random.randint(0, 1000, size=(3, 64, 64), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     image = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -143,22 +143,21 @@ def test_dicom_cube_image_metadata():
 
 def test_pixel_header_validation():
     """
-    测试 PixelDataHeader 的验证功能
+    测试 PixelDataHeader 的创建和验证
     """
-    # 测试基本的 PixelDataHeader 创建
     header = PixelDataHeader(
-        RESCALE_SLOPE=2.0,
-        RESCALE_INTERCEPT=-100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16",
-        WINDOW_CENTER=50.0,
-        WINDOW_WIDTH=400.0
+        RescaleSlope=2.0,
+        RescaleIntercept=-100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16",
+        WindowCenter=50.0,
+        WindowWidth=400.0
     )
     
-    assert header.RESCALE_SLOPE == 2.0
-    assert header.RESCALE_INTERCEPT == -100.0
-    assert header.WINDOW_CENTER == 50.0
-    assert header.WINDOW_WIDTH == 400.0
+    assert header.RescaleSlope == 2.0
+    assert header.RescaleIntercept == -100.0
+    assert header.WindowCenter == 50.0
+    assert header.WindowWidth == 400.0
 
 
 def test_dicom_cube_image_with_space():
@@ -170,10 +169,10 @@ def test_dicom_cube_image_with_space():
     # 创建测试数据 - 内部格式 (z,y,x)
     raw_data = np.random.randint(0, 1000, size=(10, 20, 30), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -206,10 +205,10 @@ def test_dicom_cube_image_space_mismatch():
     # 创建不匹配的测试数据
     raw_data = np.random.randint(0, 1000, size=(10, 20, 30), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建不匹配的 Space
@@ -235,10 +234,10 @@ def test_dicom_cube_image_space_coordinate_conversion():
     # 创建测试数据 - 内部格式 (z,y,x)
     raw_data = np.random.randint(0, 1000, size=(8, 16, 24), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -296,10 +295,10 @@ def test_dcb_file_space_conversion():
     # 创建测试数据
     raw_data = np.random.randint(0, 1000, size=(6, 12, 18), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -358,10 +357,10 @@ def test_dicom_cube_image_space_round_trip():
     # 创建复杂的测试数据
     raw_data = np.random.randint(0, 1000, size=(5, 10, 15), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=0.5,
-        RESCALE_INTERCEPT=100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=0.5,
+        RescaleIntercept=100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建非标准的 Space
