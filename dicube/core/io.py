@@ -107,18 +107,13 @@ class DicomCubeImageIO:
                 details={"file_path": file_path, "file_type": file_type}
             ) from e
     
+
     @staticmethod
-    def load(file_path: str) -> 'DicomCubeImage':
-        """Load DicomCubeImage from a file.
+    def _get_reader(file_path: str) -> DcbFile:
+        """Get the appropriate reader based on the file path.
         
         Args:
-            file_path (str): Input file path.
-            
-        Returns:
-            DicomCubeImage: The loaded object from the file.
-            
-        Raises:
-            ValueError: When the file format is not supported.
+            file_path (str): Path to the input file.
         """
         # Validate required parameters
         validate_not_none(file_path, "file_path", "load operation", InvalidCubeFileError)
@@ -143,9 +138,44 @@ class DicomCubeImageIO:
                     details={"file_path": file_path, "magic_number": magic},
                     suggestion="Ensure the file is a valid DicomCube file"
                 )
+            return reader
+        
+        except Exception as e:
+            if isinstance(e, (InvalidCubeFileError, CodecError)):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to load file: {str(e)}",
+                context="load operation",
+                details={"file_path": file_path}
+            ) from e
+
+    @staticmethod
+    def load_meta(file_path: str) -> DicomMeta:
+        """Load the metadata from a file.
+        
+        Args:
+            file_path (str): Path to the input file.
+        """
+        reader = DicomCubeImageIO._get_reader(file_path)
+        return reader.read_meta()
+    
+    @staticmethod
+    def load(file_path: str, skip_meta: bool = False) -> 'DicomCubeImage':
+        """Load DicomCubeImage from a file.
+        
+        Args:
+            file_path (str): Input file path.
             
+        Returns:
+            DicomCubeImage: The loaded object from the file.
+            
+        Raises:
+            ValueError: When the file format is not supported.
+        """
+        reader = DicomCubeImageIO._get_reader(file_path)
+        try:
             # Read file contents
-            dicom_meta = reader.read_meta()
+            dicom_meta = None if skip_meta else reader.read_meta()
             space = reader.read_space()
             pixel_header = reader.read_pixel_header()
             dicom_status = reader.read_dicom_status()

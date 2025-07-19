@@ -288,8 +288,11 @@ class DicomMeta:
         # Convert each dataset to a dict representation
         dicts = []
         for ds in datasets:
-            dicts.append(ds.to_json_dict())
-
+            tmp = ds.to_json_dict(
+                bulk_data_threshold=10240, bulk_data_element_handler=lambda x: None
+            )
+            tmp.pop(get_tag_key(CommonTags.PixelData), None)
+            dicts.append(tmp)
         # Merge the dictionaries
         merged_data = _merge_dataset_list(dicts)
         return cls(merged_data, filenames)

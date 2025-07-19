@@ -64,7 +64,7 @@ def set_num_threads(num_threads: int) -> None:
     _num_threads = num_threads
 
 # Top-level convenience methods
-def load(file_path: str) -> DicomCubeImage:
+def load(file_path: str, skip_meta: bool = False) -> DicomCubeImage:
     """Load a DicomCubeImage from a file.
     
     Args:
@@ -73,8 +73,15 @@ def load(file_path: str) -> DicomCubeImage:
     Returns:
         DicomCubeImage: The loaded image object.
     """
-    return DicomCubeImageIO.load(file_path)
+    return DicomCubeImageIO.load(file_path, skip_meta)
 
+def load_meta(file_path: str) -> DicomMeta:
+    """Load the metadata from a file.
+    
+    Args:
+        file_path (str): Path to the input file.
+    """
+    return DicomCubeImageIO.load_meta(file_path)
 
 def save(
     image: DicomCubeImage,
