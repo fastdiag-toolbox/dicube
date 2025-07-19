@@ -77,10 +77,7 @@ def test_dicom_json_convert(dicom_files, dicom_meta):
     json_convert = pydicom.dcmread(dicom_files[0]).to_json_dict(
         bulk_data_threshold=10240, bulk_data_element_handler=lambda x: None
     )
-    # 使用格式化字符串创建 tag key (格式为 "ggggeeee")
-    pixel_data_key = f"{CommonTags.PixelData.group:04X}{CommonTags.PixelData.element:04X}"
-    json_back.pop(pixel_data_key)
-    json_convert.pop(pixel_data_key)
+    json_convert.pop('7FE00010') # remove pixel data
     assert (
         json_convert == json_back
     ), "read dicom json different from json convert from dicommeta."
