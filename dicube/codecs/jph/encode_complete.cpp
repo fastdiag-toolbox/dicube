@@ -105,8 +105,13 @@ py::bytes encode_image(py::array image,
     int num_components = (buf.ndim == 3) ? buf.shape[2] : 1;
 
     // 检查数据类型，目前支持 uint8 ("B")、uint16 ("H")、int16 ("h")
+    // 同时支持带字节序前缀的格式（如 "<H", ">H", "=H" 等）
     std::string format = buf.format;
-    if (format != "B" && format != "H" && format != "h")
+    bool is_uint8 = (format == "B" || format == "<B" || format == ">B" || format == "=B");
+    bool is_uint16 = (format == "H" || format == "<H" || format == ">H" || format == "=H");
+    bool is_int16 = (format == "h" || format == "<h" || format == ">h" || format == "=h");
+    
+    if (!is_uint8 && !is_uint16 && !is_int16)
         throw std::runtime_error("Unsupported dtype. Only uint8, uint16, and int16 are supported.");
 
     // 创建输出内存文件
@@ -124,11 +129,11 @@ py::bytes encode_image(py::array image,
     siz.set_tile_size(size(width, height));  // 单一 tile
     siz.set_num_components(num_components);
     for (int c = 0; c < num_components; c++) {
-        if (format == "B")
+        if (is_uint8)
             siz.set_component(c, point(1, 1), 8, false);
-        else if (format == "H")
+        else if (is_uint16)
             siz.set_component(c, point(1, 1), 16, false);
-        else if (format == "h")
+        else if (is_int16)
             siz.set_component(c, point(1, 1), 16, true);
     }
 
@@ -175,13 +180,13 @@ py::bytes encode_image(py::array image,
                 // 对每个像素，按照正确的步长提取当前通道的值
                 for (int x = 0; x < width; x++) {
                     int32_t value = 0;
-                    if (format == "B") {
+                    if (is_uint8) {
                         const uint8_t* src = reinterpret_cast<const uint8_t*>(row_ptr);
                         value = src[x * step];
-                    } else if (format == "H") {
+                    } else if (is_uint16) {
                         const uint16_t* src = reinterpret_cast<const uint16_t*>(row_ptr);
                         value = src[x * step];
-                    } else if (format == "h") {
+                    } else if (is_int16) {
                         const int16_t* src = reinterpret_cast<const int16_t*>(row_ptr);
                         value = src[x * step];
                     }
