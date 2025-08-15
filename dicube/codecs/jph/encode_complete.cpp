@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <cstdint>
+#include <iostream>
 
 // 此文件不需要ssize_t定义
 
@@ -106,7 +107,19 @@ py::bytes encode_image(py::array image,
 
     // 检查数据类型，目前支持 uint8 ("B")、uint16 ("H")、int16 ("h")
     std::string format = buf.format;
-    if (format != "B" && format != "H" && format != "h")
+    
+    // #ifdef DEBUG
+    // std::cout << "DEBUG: Image format = " << format << std::endl;
+    // std::cout << "DEBUG: Image shape = (" << height << ", " << width << ", " << num_components << ")" << std::endl;
+    // std::cout << "DEBUG: Image strides = [" << buf.strides[0] << ", " << buf.strides[1];
+    // if (buf.ndim == 3) std::cout << ", " << buf.strides[2];
+    // std::cout << "]" << std::endl;
+    // #endif
+    
+    // 提取数据类型字符，忽略字节序前缀（如 '<', '>', '='）
+    char dtype_char = format.back(); // 获取最后一个字符作为数据类型标识
+    
+    if (dtype_char != 'B' && dtype_char != 'H' && dtype_char != 'h')
         throw std::runtime_error("Unsupported dtype. Only uint8, uint16, and int16 are supported.");
 
     // 创建输出内存文件
@@ -124,11 +137,11 @@ py::bytes encode_image(py::array image,
     siz.set_tile_size(size(width, height));  // 单一 tile
     siz.set_num_components(num_components);
     for (int c = 0; c < num_components; c++) {
-        if (format == "B")
+        if (dtype_char == 'B')
             siz.set_component(c, point(1, 1), 8, false);
-        else if (format == "H")
+        else if (dtype_char == 'H')
             siz.set_component(c, point(1, 1), 16, false);
-        else if (format == "h")
+        else if (dtype_char == 'h')
             siz.set_component(c, point(1, 1), 16, true);
     }
 
@@ -175,13 +188,13 @@ py::bytes encode_image(py::array image,
                 // 对每个像素，按照正确的步长提取当前通道的值
                 for (int x = 0; x < width; x++) {
                     int32_t value = 0;
-                    if (format == "B") {
+                    if (dtype_char == 'B') {
                         const uint8_t* src = reinterpret_cast<const uint8_t*>(row_ptr);
                         value = src[x * step];
-                    } else if (format == "H") {
+                    } else if (dtype_char == 'H') {
                         const uint16_t* src = reinterpret_cast<const uint16_t*>(row_ptr);
                         value = src[x * step];
-                    } else if (format == "h") {
+                    } else if (dtype_char == 'h') {
                         const int16_t* src = reinterpret_cast<const int16_t*>(row_ptr);
                         value = src[x * step];
                     }

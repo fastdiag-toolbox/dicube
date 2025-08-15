@@ -113,3 +113,45 @@ python_functions = ["test_*"]
 [tool.setuptools_scm]
 version_scheme = "no-guess-dev"
 local_scheme = "no-local-version" 
+
+[tool.poetry]
+name = "dicube"
+version = "0.0.0"
+description = "Medical Image Storage Library with DICOM compatibility"
+authors = ["Fangzhou Liao"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "dicube"}]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+numpy = "^1.21.0"
+pydicom = "^2.3.0"
+zstandard = "^0.18.0"
+spacetransformer-core = {path = "../spacetransformer-core"}
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+pytest-cov = "^4.0.0"
+black = "^22.0.0"
+ruff = "^0.1.0"
+mypy = "^1.0.0"
+build = "^0.8.0"
+pylibjpeg = "^2.0"
+pylibjpeg-openjpeg = "^2.0"
+nibabel = "^3.2.0"
+
+[tool.poetry.group.jph.dependencies]
+pybind11 = "^2.10.0"
+
+[tool.poetry.group.nifti.dependencies]
+nibabel = "^3.2.0"
+
+[tool.poetry.group.all.dependencies]
+pybind11 = "^2.10.0"
+nibabel = "^3.2.0"
+
+[tool.poetry.urls]
+"Homepage" = "https://github.com/fastdiag-toolbox/dicube"
+"Bug Reports" = "https://github.com/fastdiag-toolbox/dicube/issues"
+"Source" = "https://github.com/fastdiag-toolbox/dicube" 
