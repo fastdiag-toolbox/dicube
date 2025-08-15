@@ -101,9 +101,9 @@ def _display(meta, show_shared=True, show_non_shared=True):
     Returns:
         pandas.DataFrame: Formatted metadata tables.
     """
+
     import pandas as pd
     from .dicom_tags import CommonTags
-
     # Prepare shared and non-shared data
     shared_data = []
     non_shared_data = {}
@@ -137,7 +137,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
     # Process each tag
     for tag_key in meta.keys():
         tag = Tag(int(tag_key[:4], 16), int(tag_key[4:], 16))
-        tag_name = datadict.dicom_dict_summary.get(tag, {}).get("name", f"({tag.group:04X},{tag.element:04X})")
+        tag_name = datadict.keyword_for_tag(tag)
         vr = meta.get_vr(tag)
         
         if meta.is_shared(tag):
@@ -198,7 +198,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
                 for tag in non_shared_tags
             }
             name_row = {
-                f"({tag.group:04X},{tag.element:04X})": non_shared_data[tag.key]["Name"]
+                f"({tag.group:04X},{tag.element:04X})": non_shared_data[get_tag_key(tag)]["Name"]
                 for tag in non_shared_tags
             }
 
@@ -206,7 +206,7 @@ def _display(meta, show_shared=True, show_non_shared=True):
             values_rows = []
             for idx in range(meta.slice_count):
                 row = {
-                    f"({tag.group:04X},{tag.element:04X})": non_shared_data[tag.key]["Values"][idx]
+                    f"({tag.group:04X},{tag.element:04X})": non_shared_data[get_tag_key(tag)]["Values"][idx]
                     for tag in non_shared_tags
                 }
                 values_rows.append(row)
@@ -288,8 +288,11 @@ class DicomMeta:
         # Convert each dataset to a dict representation
         dicts = []
         for ds in datasets:
-            dicts.append(ds.to_json_dict())
-
+            tmp = ds.to_json_dict(
+                bulk_data_threshold=10240, bulk_data_element_handler=lambda x: None
+            )
+            tmp.pop(get_tag_key(CommonTags.PixelData), None)
+            dicts.append(tmp)
         # Merge the dictionaries
         merged_data = _merge_dataset_list(dicts)
         return cls(merged_data, filenames)

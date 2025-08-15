@@ -1,5 +1,6 @@
 .kiro
 trash
+dicube/_version.py
 *.mska
 *.msk
 *.nii
@@ -62,3 +63,9 @@ ENV/
 
 # uv local cache
 .uv/ 
+
+# testdata
+testdata/
+testdata2/
+
+tmpdir/

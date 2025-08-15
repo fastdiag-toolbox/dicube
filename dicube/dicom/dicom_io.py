@@ -86,34 +86,34 @@ def create_dicom_dataset(meta_dict: dict, pixel_header):
 
     ds.file_meta = create_file_meta(ds)
     ensure_required_tags(ds)
-    ds.RescaleSlope = pixel_header.RESCALE_SLOPE
-    ds.RescaleIntercept = pixel_header.RESCALE_INTERCEPT
+    ds.RescaleSlope = pixel_header.RescaleSlope
+    ds.RescaleIntercept = pixel_header.RescaleIntercept
 
     return ds
 
 
 def save_dicom(ds: Dataset, output_path: str):
-    """保存DICOM文件
+    """Save DICOM file.
     
-    参数:
-        ds: DICOM数据集
-        output_path: 输出文件路径
+    Args:
+        ds: DICOM dataset
+        output_path: Output file path
     """
     
     sig = inspect.signature(Dataset.save_as)
     if "enforce_file_format" in sig.parameters:  # pydicom >= 3.0
         ds.save_as(output_path, enforce_file_format=True)
     else:
-        # 确保使用有效的传输语法UID
+        # Ensure valid transfer syntax UID
         if hasattr(ds, 'file_meta') and hasattr(ds.file_meta, 'TransferSyntaxUID'):
-            # 检查是否有效，如果无效则替换为标准的ExplicitVRLittleEndian
+            # Check if valid, replace with standard ExplicitVRLittleEndian if invalid
             try:
                 from pydicom.uid import UID
                 uid = UID(ds.file_meta.TransferSyntaxUID)
                 if not hasattr(uid, 'is_little_endian'):
                     ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
             except (ValueError, AttributeError):
-                # 如果UID无效，使用标准的ExplicitVRLittleEndian
+                # If UID is invalid, use standard ExplicitVRLittleEndian
                 ds.file_meta.TransferSyntaxUID = ExplicitVRLittleEndian
         ds.save_as(output_path, write_like_original=False)
 
@@ -124,14 +124,14 @@ def save_to_dicom_folder(
     output_dir: str,
     filenames: Optional[List[str]] = None,
 ):
-    """将图像数据保存为DICOM文件夹
+    """Save image data as DICOM folder.
     
-    参数:
-        raw_images: 原始图像数据，可以是2D或3D数组
-        dicom_meta: DICOM元数据
-        pixel_header: 像素头信息
-        output_dir: 输出目录
-        filenames: 自定义文件名列表，如果为None则使用默认名称
+    Args:
+        raw_images: Raw image data, can be 2D or 3D array
+        dicom_meta: DICOM metadata
+        pixel_header: Pixel header information
+        output_dir: Output directory
+        filenames: Custom filename list, if None default names will be used
     """
     prepare_output_dir(output_dir)
 

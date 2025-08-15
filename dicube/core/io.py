@@ -16,7 +16,7 @@ from ..dicom import (
 )
 from ..dicom.dicom_io import save_to_dicom_folder
 from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
-from ..storage.pixel_utils import derive_pixel_header_from_array
+from ..storage.pixel_utils import derive_pixel_header_from_array, determine_optimal_nifti_dtype
 from .pixel_header import PixelDataHeader
 
 from ..validation import (
@@ -52,7 +52,6 @@ class DicomCubeImageIO:
         image: "DicomCubeImage",
         file_path: str,
         file_type: str = "s",
-        num_threads: int = 4,
     ) -> None:
         """Save DicomCubeImage to a file.
         
@@ -61,7 +60,6 @@ class DicomCubeImageIO:
             file_path (str): Output file path.
             file_type (str): File type, "s" (speed priority), "a" (compression priority), 
                              or "l" (lossy compression). Defaults to "s".
-            num_threads (int): Number of parallel encoding threads. Defaults to 4.
             
         Raises:
             InvalidCubeFileError: If the file_type is not supported.
@@ -69,7 +67,6 @@ class DicomCubeImageIO:
         # Validate required parameters
         validate_not_none(image, "image", "save operation", DataConsistencyError)
         validate_string_not_empty(file_path, "file_path", "save operation", InvalidCubeFileError)
-        validate_numeric_range(num_threads, "num_threads", min_value=1, context="save operation")
         
         # Validate file_type parameter
         if file_type not in ("s", "a", "l"):
@@ -82,6 +79,7 @@ class DicomCubeImageIO:
         
         try:
             # Choose appropriate writer based on file type
+            # The writer will automatically ensure correct file extension
             if file_type == "s":
                 writer = DcbSFile(file_path, mode="w")
             elif file_type == "a":
@@ -89,14 +87,16 @@ class DicomCubeImageIO:
             elif file_type == "l":
                 writer = DcbLFile(file_path, mode="w")
             
+            # Update file_path to the corrected path from writer
+            file_path = writer.filename
+            
             # Write to file
             writer.write(
                 images=image.raw_image,
                 pixel_header=image.pixel_header,
                 dicom_meta=image.dicom_meta,
                 space=image.space,
-                num_threads=num_threads,
-                dicom_status=image.dicom_status
+                dicom_status=image.dicom_status,
             )
         except Exception as e:
             if isinstance(e, (InvalidCubeFileError, CodecError)):
@@ -107,20 +107,13 @@ class DicomCubeImageIO:
                 details={"file_path": file_path, "file_type": file_type}
             ) from e
     
+
     @staticmethod
-    def load(file_path: str, num_threads: int = 4, **kwargs) -> 'DicomCubeImage':
-        """Load DicomCubeImage from a file.
+    def _get_reader(file_path: str) -> DcbFile:
+        """Get the appropriate reader based on the file path.
         
         Args:
-            file_path (str): Input file path.
-            num_threads (int): Number of parallel decoding threads. Defaults to 4.
-            **kwargs: Additional parameters passed to the underlying reader.
-            
-        Returns:
-            DicomCubeImage: The loaded object from the file.
-            
-        Raises:
-            ValueError: When the file format is not supported.
+            file_path (str): Path to the input file.
         """
         # Validate required parameters
         validate_not_none(file_path, "file_path", "load operation", InvalidCubeFileError)
@@ -145,14 +138,49 @@ class DicomCubeImageIO:
                     details={"file_path": file_path, "magic_number": magic},
                     suggestion="Ensure the file is a valid DicomCube file"
                 )
+            return reader
+        
+        except Exception as e:
+            if isinstance(e, (InvalidCubeFileError, CodecError)):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to load file: {str(e)}",
+                context="load operation",
+                details={"file_path": file_path}
+            ) from e
+
+    @staticmethod
+    def load_meta(file_path: str) -> DicomMeta:
+        """Load the metadata from a file.
+        
+        Args:
+            file_path (str): Path to the input file.
+        """
+        reader = DicomCubeImageIO._get_reader(file_path)
+        return reader.read_meta()
+    
+    @staticmethod
+    def load(file_path: str, skip_meta: bool = False) -> 'DicomCubeImage':
+        """Load DicomCubeImage from a file.
+        
+        Args:
+            file_path (str): Input file path.
             
+        Returns:
+            DicomCubeImage: The loaded object from the file.
+            
+        Raises:
+            ValueError: When the file format is not supported.
+        """
+        reader = DicomCubeImageIO._get_reader(file_path)
+        try:
             # Read file contents
-            dicom_meta = reader.read_meta()
+            dicom_meta = None if skip_meta else reader.read_meta()
             space = reader.read_space()
             pixel_header = reader.read_pixel_header()
             dicom_status = reader.read_dicom_status()
             
-            images = reader.read_images(num_threads=num_threads)
+            images = reader.read_images()
             if isinstance(images, list):
                 # Convert list to ndarray if needed
                 images = np.stack(images)
@@ -180,7 +208,6 @@ class DicomCubeImageIO:
     def load_from_dicom_folder(
         folder_path: str,
         sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
-        **kwargs
     ) -> 'DicomCubeImage':
         """Load DicomCubeImage from a DICOM folder.
         
@@ -188,7 +215,6 @@ class DicomCubeImageIO:
             folder_path (str): Path to the DICOM folder.
             sort_method (SortMethod): Method to sort DICOM files. 
                                       Defaults to SortMethod.INSTANCE_NUMBER_ASC.
-            **kwargs: Additional parameters.
             
         Returns:
             DicomCubeImage: The object created from the DICOM folder.
@@ -243,15 +269,21 @@ class DicomCubeImageIO:
             intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
             wind_center = meta.get_shared_value(CommonTags.WindowCenter)
             wind_width = meta.get_shared_value(CommonTags.WindowWidth)
+            try:
+                wind_center = float(wind_center)
+                wind_width = float(wind_width)
+            except:
+                wind_center = None
+                wind_width = None
             
             # Create pixel_header
             pixel_header = PixelDataHeader(
-                RESCALE_SLOPE=float(slope) if slope is not None else 1.0,
-                RESCALE_INTERCEPT=float(intercept) if intercept is not None else 0.0,
-                ORIGINAL_PIXEL_DTYPE=str(images[0].dtype),
-                PIXEL_DTYPE=str(images[0].dtype),
-                WINDOW_CENTER=float(wind_center) if wind_center is not None else None,
-                WINDOW_WIDTH=float(wind_width) if wind_width is not None else None,
+                RescaleSlope=float(slope) if slope is not None else 1.0,
+                RescaleIntercept=float(intercept) if intercept is not None else 0.0,
+                OriginalPixelDtype=str(images[0].dtype),
+                PixelDtype=str(images[0].dtype),
+                WindowCenter=wind_center,
+                WindowWidth=wind_width,
             )
             
             # Validate PixelDataHeader initialization success
@@ -282,12 +314,11 @@ class DicomCubeImageIO:
             ) from e
     
     @staticmethod
-    def load_from_nifti(file_path: str, **kwargs) -> 'DicomCubeImage':
+    def load_from_nifti(file_path: str) -> 'DicomCubeImage':
         """Load DicomCubeImage from a NIfTI file.
         
         Args:
             file_path (str): Path to the NIfTI file.
-            **kwargs: Additional parameters.
             
         Returns:
             DicomCubeImage: The object created from the NIfTI file.
@@ -352,3 +383,56 @@ class DicomCubeImageIO:
             pixel_header=image.pixel_header,
             output_dir=folder_path,
         ) 
+        
+    @staticmethod
+    def save_to_nifti(
+        image: 'DicomCubeImage',
+        file_path: str,
+    ) -> None:
+        """Save DicomCubeImage as a NIfTI file.
+        
+        Args:
+            image (DicomCubeImage): The DicomCubeImage object to save.
+            file_path (str): Output file path.
+            
+        Raises:
+            ImportError: When nibabel is not installed.
+            InvalidCubeFileError: When saving fails.
+        """
+        # Validate required parameters
+        validate_not_none(image, "image", "save_to_nifti operation", DataConsistencyError)
+        validate_string_not_empty(file_path, "file_path", "save_to_nifti operation", InvalidCubeFileError)
+        
+        try:
+            import nibabel as nib
+        except ImportError:
+            raise ImportError("nibabel is required to write NIfTI files")
+        
+        try:
+            if image.space is None:
+                raise InvalidCubeFileError(
+                    "Cannot save to NIfTI without space information",
+                    context="save_to_nifti operation",
+                    suggestion="Ensure the DicomCubeImage has valid space information"
+                )
+            
+            # Get affine matrix from space
+            affine = image.space.to_nifti_affine()
+            
+            # 根据像素数据和metadata确定最佳的数据类型
+            optimal_data, dtype_name = determine_optimal_nifti_dtype(image.raw_image, image.pixel_header)
+            
+            # Create NIfTI image with optimized data type
+            nii = nib.Nifti1Image(optimal_data, affine)
+            
+            # Save to file
+            nib.save(nii, file_path)
+        except Exception as e:
+            if isinstance(e, (ImportError, InvalidCubeFileError)):
+                raise
+            raise InvalidCubeFileError(
+                f"Failed to save NIfTI file: {str(e)}",
+                context="save_to_nifti operation",
+                details={"file_path": file_path},
+                suggestion="Check file permissions and ensure space information is valid"
+            ) from e 

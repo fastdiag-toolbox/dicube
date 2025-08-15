@@ -86,12 +86,14 @@ class DcbFile:
         MAGIC (bytes): Magic bytes for file identification.
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID.
+        FILE_EXTENSION (str): File extension for this format.
     """
 
     HEADER_STRUCT = "<8sI13Q"
     MAGIC = b"DCMCUBE\x00"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # Base class has no specific transfer syntax
+    FILE_EXTENSION = ".dcb"  # Default extension
 
     def __init__(self, filename: str, mode: str = "r"):
         """Initialize a DCB file object.
@@ -112,12 +114,29 @@ class DcbFile:
                 suggestion="Use 'r' for reading, 'w' for writing, or 'a' for appending"
             )
         
+        # For write mode, ensure filename has correct extension
+        if mode == "w":
+            filename = self._ensure_correct_extension(filename)
+        
         self.filename = filename
         self.mode = mode
         self._header = None  # Delay reading header until needed
 
         if os.path.exists(filename) and mode in ("r", "a"):
             self._read_header_and_check_type()
+
+    def _ensure_correct_extension(self, filename: str) -> str:
+        """Ensure the filename has the correct extension for this file type.
+        
+        Args:
+            filename (str): The original filename.
+            
+        Returns:
+            str: The filename with correct extension.
+        """
+        if not filename.endswith(self.FILE_EXTENSION):
+            return filename + self.FILE_EXTENSION
+        return filename
 
     def _read_header_and_check_type(self):
         """Read file header and determine the correct subclass."""
@@ -265,12 +284,9 @@ class DcbFile:
             else:
                 dicom_status = DicomStatus.CONSISTENT
 
-        # Handle both enum and string values for dicom_status
-        if isinstance(dicom_status, DicomStatus):
-            dicom_status_bin = dicom_status.value.encode("utf-8")
-        else:
-            # If it's already a string, encode it directly
-            dicom_status_bin = dicom_status.encode("utf-8")
+        # Convert DicomStatus enum to string for storage
+        # If None was provided, dicom_status will be a DicomStatus enum at this point
+        dicom_status_bin = dicom_status.value.encode("utf-8")
 
         # Process dicom_meta
         if dicom_meta:
@@ -297,17 +313,20 @@ class DcbFile:
             'pixel_header_bin': pixel_header_bin
         }
     
-    def _encode_frames(self, images: List, num_threads: int = 4):
+    def _encode_frames(self, images: List):
         """Encode frames using parallel or serial processing.
         
         Args:
             images (List): List of frames to encode.
-            num_threads (int): Number of worker threads for parallel encoding.
             
         Returns:
             List[bytes]: List of encoded frame data.
         """
-        if num_threads is not None and num_threads > 1:
+        # Import get_num_threads function to avoid circular import
+        from .. import get_num_threads
+        num_threads = get_num_threads()
+        
+        if num_threads > 1:
             # Parallel encoding
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 encoded_blobs = list(
@@ -408,9 +427,8 @@ class DcbFile:
         images: List,  # Can be List[np.ndarray] or List[Tuple] for ROI data
         pixel_header: PixelDataHeader,
         dicom_meta: Optional[DicomMeta] = None,
+        dicom_status: DicomStatus = DicomStatus.CONSISTENT,
         space: Optional[Space] = None,
-        num_threads: int = 4,
-        dicom_status: Optional[DicomStatus] = None,
     ):
         """Write image data and metadata to a DCB file.
 
@@ -422,9 +440,8 @@ class DcbFile:
                 or List[Tuple[np.ndarray, np.ndarray, np.ndarray]] for ROI files.
             pixel_header (PixelDataHeader): PixelDataHeader instance containing pixel metadata.
             dicom_meta (DicomMeta, optional): DICOM metadata. Defaults to None.
+            dicom_status (DicomStatus): DICOM status enumeration. Defaults to DicomStatus.CONSISTENT.
             space (Space, optional): Spatial information. Defaults to None.
-            num_threads (int): Number of worker threads for parallel encoding. Defaults to 4.
-            dicom_status (str, optional): DICOM status string value. Defaults to None.
         """
         if images is None:
             images = []
@@ -436,7 +453,7 @@ class DcbFile:
         )
         
         # Encode frames
-        encoded_frames = self._encode_frames(images, num_threads)
+        encoded_frames = self._encode_frames(images)
 
         # Write file structure
         header_size = struct.calcsize(self.HEADER_STRUCT)
@@ -560,42 +577,41 @@ class DcbFile:
         pixel_header_json = pixel_header_bin.decode("utf-8")
         return HeaderClass.from_json(pixel_header_json)
 
-    def read_images(self, num_threads: int = 4):
+    def read_images(self):
         """Read all image frames from the file.
-
-        Args:
-            num_threads (int): Number of worker threads for parallel decoding.
-                Defaults to 4.
-
+            
         Returns:
             List[np.ndarray] or np.ndarray: The decoded image frames. If the number of frames is 1,
                 returns a single numpy array, otherwise returns a list of arrays.
         """
+        # Import get_num_threads function to avoid circular import
+        from .. import get_num_threads
+        
         hdr = self.header
         frame_count = hdr["frame_count"]
-
+        
         if frame_count == 0:
             # No frames to read
             pixel_header = self.read_pixel_header()
-            return np.array([], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE)
+            return np.array([], dtype=pixel_header.OriginalPixelDtype)
 
         # Read frame offsets and lengths
         frame_offsets_offset = hdr["frame_offsets_offset"]
         frame_offsets_length = hdr["frame_offsets_length"]
         frame_lengths_offset = hdr["frame_lengths_offset"]
         frame_lengths_length = hdr["frame_lengths_length"]
-
+        
         with open(self.filename, "rb") as f:
             # Read frame offsets
             f.seek(frame_offsets_offset)
             frame_offsets_bin = f.read(frame_offsets_length)
             frame_offsets = struct.unpack(f"<{frame_count}Q", frame_offsets_bin)
-
+            
             # Read frame lengths
             f.seek(frame_lengths_offset)
             frame_lengths_bin = f.read(frame_lengths_length)
             frame_lengths = struct.unpack(f"<{frame_count}Q", frame_lengths_bin)
-
+            
             # Read each frame data
             frame_data_list = []
             for offset, length in zip(frame_offsets, frame_lengths):
@@ -610,8 +626,9 @@ class DcbFile:
 
         # Decode frames (with parallelization if needed)
         frames = []
-
-        if num_threads is not None and num_threads > 1 and frame_count > 1:
+        
+        num_threads = get_num_threads()
+        if num_threads > 1 and frame_count > 1:
             # Parallel decoding
             with ThreadPoolExecutor(max_workers=num_threads) as executor:
                 frames = list(
@@ -633,7 +650,7 @@ class DcbFile:
         if len(frames) == 0:
             # Return empty array if no frames were decoded
             pixel_header = self.read_pixel_header()
-            return np.array([], dtype=pixel_header.ORIGINAL_PIXEL_DTYPE)
+            return np.array([], dtype=pixel_header.OriginalPixelDtype)
         elif len(frames) == 1:
             # Return single frame directly
             return frames[0]
@@ -642,49 +659,45 @@ class DcbFile:
             return frames
 
     def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
-        """Encode a single frame of image data.
-
-        This is a placeholder method to be implemented by subclasses.
+        """Encode a single frame to bytes.
+        
+        Default implementation returns empty bytes.
+        Subclasses should override this method to implement specific encoding.
 
         Args:
-            frame_data (np.ndarray): The frame data to encode.
-
+            frame_data (np.ndarray): The image frame to encode.
+            
         Returns:
             bytes: The encoded frame data.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
         """
-        raise NotImplementedError("Subclass must implement _encode_one_frame")
+        return np.array([], dtype=self.pixel_header.OriginalPixelDtype)
 
     def _decode_one_frame(self, bytes) -> np.ndarray:
-        """Decode a single frame of image data.
-
-        This is a placeholder method to be implemented by subclasses.
+        """Decode a single frame from bytes.
+        
+        Default implementation returns an empty array with the correct data type.
+        Subclasses should override this method to implement specific decoding.
 
         Args:
             bytes (bytes): The encoded frame data.
 
         Returns:
-            np.ndarray: The decoded frame data.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
+            np.ndarray: The decoded image frame.
         """
-        raise NotImplementedError("Subclass must implement _decode_one_frame")
+        return np.array([], dtype=self.header_data['pixel_header'].OriginalPixelDtype)
 
-    def read_dicom_status(self) -> str:
+    def read_dicom_status(self) -> DicomStatus:
         """Read DICOM status information from the file.
 
         Returns:
-            str: The DICOM status string, or DicomStatus.CONSISTENT.value if not present.
+            DicomStatus: The DICOM status enum value, or DicomStatus.CONSISTENT if not present.
         """
         hdr = self.header
         dicom_status_offset = hdr["dicom_status_offset"]
         dicom_status_length = hdr["dicom_status_length"]
 
         if dicom_status_length == 0:
-            return DicomStatus.CONSISTENT.value
+            return DicomStatus.CONSISTENT
 
         with open(self.filename, "rb") as f:
             f.seek(dicom_status_offset)
@@ -715,12 +728,14 @@ class DcbSFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str): DICOM transfer syntax UID for HTJ2K Lossless.
         CODEC_NAME (str): Codec name used for compression.
+        FILE_EXTENSION (str): File extension for speed-optimized format.
     """
 
     MAGIC = b"DCMCUBES"
     VERSION = 1
     TRANSFER_SYNTAX_UID = "1.2.840.10008.1.2.4.201"  # HTJ2K Lossless
     CODEC_NAME = "jph"
+    FILE_EXTENSION = ".dcbs"
 
     def _encode_one_frame(self, frame_data: np.ndarray) -> bytes:
         """Encode a single frame using the HTJ2K codec.
@@ -778,12 +793,14 @@ class DcbAFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID, set when codec is selected.
         CODEC_NAME (str, optional): Codec name, set when codec is selected.
+        FILE_EXTENSION (str): File extension for archive-optimized format.
     """
 
     MAGIC = b"DCMCUBEA"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
     CODEC_NAME = None  # To be defined when codec is selected
+    FILE_EXTENSION = ".dcba"
 
 
 class DcbLFile(DcbFile):
@@ -797,9 +814,11 @@ class DcbLFile(DcbFile):
         VERSION (int): File format version.
         TRANSFER_SYNTAX_UID (str, optional): DICOM transfer syntax UID, set when codec is selected.
         CODEC_NAME (str, optional): Codec name, set when codec is selected.
+        FILE_EXTENSION (str): File extension for lossy compression format.
     """
 
     MAGIC = b"DCMCUBEL"
     VERSION = 1
     TRANSFER_SYNTAX_UID = None  # To be defined when codec is selected
     CODEC_NAME = None  # To be defined when codec is selected
+    FILE_EXTENSION = ".dcbl"

@@ -16,10 +16,10 @@ def test_dicom_cube_image_init():
     # 构造一个 10x10x10 的 3D 图像
     raw_data = np.arange(1000).reshape(10, 10, 10).astype(np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=2.0,
-        RESCALE_INTERCEPT=-100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16",
+        RescaleSlope=2.0,
+        RescaleIntercept=-100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16",
     )
     img = DicomCubeImage(raw_data, pixel_header=pixel_header)
     assert img.raw_image.shape == (10, 10, 10)
@@ -38,12 +38,12 @@ def test_dicom_cube_image_basic_operations():
     """
     raw_data = np.random.randint(0, 1000, size=(5, 64, 64), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=-1024.0,
-        ORIGINAL_PIXEL_DTYPE="uint16", 
-        PIXEL_DTYPE="uint16",
-        WINDOW_CENTER=50.0,
-        WINDOW_WIDTH=400.0
+        RescaleSlope=1.0,
+        RescaleIntercept=-1024.0,
+        OriginalPixelDtype="uint16", 
+        PixelDtype="uint16",
+        WindowCenter=50.0,
+        WindowWidth=400.0
     )
     
     img = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -88,10 +88,10 @@ def test_dicom_cube_image_to_dicom_folder():
     # 构造一个简单的 DicomCubeImage
     raw_data = np.random.randint(0, 1000, size=(5, 128, 128), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=-1024.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=-1024.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     image = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -119,10 +119,10 @@ def test_dicom_cube_image_metadata():
     """
     raw_data = np.random.randint(0, 1000, size=(3, 64, 64), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     image = DicomCubeImage(raw_data, pixel_header=pixel_header)
@@ -143,22 +143,21 @@ def test_dicom_cube_image_metadata():
 
 def test_pixel_header_validation():
     """
-    测试 PixelDataHeader 的验证功能
+    测试 PixelDataHeader 的创建和验证
     """
-    # 测试基本的 PixelDataHeader 创建
     header = PixelDataHeader(
-        RESCALE_SLOPE=2.0,
-        RESCALE_INTERCEPT=-100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16",
-        WINDOW_CENTER=50.0,
-        WINDOW_WIDTH=400.0
+        RescaleSlope=2.0,
+        RescaleIntercept=-100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16",
+        WindowCenter=50.0,
+        WindowWidth=400.0
     )
     
-    assert header.RESCALE_SLOPE == 2.0
-    assert header.RESCALE_INTERCEPT == -100.0
-    assert header.WINDOW_CENTER == 50.0
-    assert header.WINDOW_WIDTH == 400.0
+    assert header.RescaleSlope == 2.0
+    assert header.RescaleIntercept == -100.0
+    assert header.WindowCenter == 50.0
+    assert header.WindowWidth == 400.0
 
 
 def test_dicom_cube_image_with_space():
@@ -170,10 +169,10 @@ def test_dicom_cube_image_with_space():
     # 创建测试数据 - 内部格式 (z,y,x)
     raw_data = np.random.randint(0, 1000, size=(10, 20, 30), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -206,10 +205,10 @@ def test_dicom_cube_image_space_mismatch():
     # 创建不匹配的测试数据
     raw_data = np.random.randint(0, 1000, size=(10, 20, 30), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建不匹配的 Space
@@ -235,10 +234,10 @@ def test_dicom_cube_image_space_coordinate_conversion():
     # 创建测试数据 - 内部格式 (z,y,x)
     raw_data = np.random.randint(0, 1000, size=(8, 16, 24), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -296,10 +295,10 @@ def test_dcb_file_space_conversion():
     # 创建测试数据
     raw_data = np.random.randint(0, 1000, size=(6, 12, 18), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=1.0,
-        RESCALE_INTERCEPT=0.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建 Space - 内部格式 (z,y,x)
@@ -358,10 +357,10 @@ def test_dicom_cube_image_space_round_trip():
     # 创建复杂的测试数据
     raw_data = np.random.randint(0, 1000, size=(5, 10, 15), dtype=np.uint16)
     pixel_header = PixelDataHeader(
-        RESCALE_SLOPE=0.5,
-        RESCALE_INTERCEPT=100.0,
-        ORIGINAL_PIXEL_DTYPE="uint16",
-        PIXEL_DTYPE="uint16"
+        RescaleSlope=0.5,
+        RescaleIntercept=100.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
     )
     
     # 创建非标准的 Space
@@ -405,3 +404,202 @@ def test_dicom_cube_image_space_round_trip():
             # 清理临时文件
             if os.path.exists(temp_filename):
                 os.unlink(temp_filename) 
+
+
+def test_nifti_round_trip_consistency():
+    """
+    测试NIfTI文件的循环一致性 - 读入、写出、再读入，检查pixel array和affine一致性
+    """
+    try:
+        import nibabel as nib
+    except ImportError:
+        pytest.skip("nibabel not installed, skipping NIfTI test")
+    
+    import tempfile
+    from spacetransformer import Space
+    
+    # 创建测试数据 - 内部格式 (z,y,x)
+    raw_data = np.random.randint(0, 1000, size=(10, 20, 30), dtype=np.uint16)
+    pixel_header = PixelDataHeader(
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
+    )
+    
+    # 创建 Space - 内部格式 (z,y,x)
+    test_space = Space(
+        shape=(10, 20, 30),
+        origin=(5.0, 10.0, 15.0),  # 非零原点以便测试
+        spacing=(1.5, 0.8, 0.5),   # 非均匀间距以便测试
+        x_orientation=(1.0, 0.0, 0.0),
+        y_orientation=(0.0, 1.0, 0.0),
+        z_orientation=(0.0, 0.0, 1.0)
+    )
+    
+    # 创建 DicomCubeImage
+    original_image = DicomCubeImage(raw_data, pixel_header, space=test_space)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # 输出路径
+        nifti_path = os.path.join(temp_dir, "test.nii.gz")
+        
+        # 保存为NIfTI
+        dicube.save_to_nifti(original_image, nifti_path)
+        assert os.path.exists(nifti_path), "NIfTI file was not created"
+        
+        # 从NIfTI读取
+        loaded_image = dicube.load_from_nifti(nifti_path)
+        
+        # 保存到另一个NIfTI文件
+        nifti_path2 = os.path.join(temp_dir, "test2.nii.gz")
+        dicube.save_to_nifti(loaded_image, nifti_path2)
+        
+        # 再次读取
+        final_image = dicube.load_from_nifti(nifti_path2)
+        
+        # 验证像素数据一致性
+        assert original_image.raw_image.shape == final_image.raw_image.shape, "Shape mismatch"
+        assert np.array_equal(original_image.raw_image, final_image.raw_image), "Pixel data mismatch"
+        
+        # 验证空间信息一致性
+        assert original_image.space.shape == final_image.space.shape, "Space shape mismatch"
+        assert np.allclose(original_image.space.origin, final_image.space.origin, atol=1e-5), "Origin mismatch"
+        assert np.allclose(original_image.space.spacing, final_image.space.spacing, atol=1e-5), "Spacing mismatch"
+        assert np.allclose(original_image.space.to_nifti_affine(), final_image.space.to_nifti_affine(), atol=1e-5), "Affine mismatch"
+        
+        # 直接使用nibabel比较affine
+        nib1 = nib.load(nifti_path)
+        nib2 = nib.load(nifti_path2)
+        assert np.allclose(nib1.affine, nib2.affine, atol=1e-5), "NiBabel affine mismatch"
+
+
+@pytest.mark.skipif(
+    not os.path.exists("testdata/nifti/s0000.nii.gz"),
+    reason="Sample NIfTI data not available"
+)
+def test_nifti_real_data_round_trip():
+    """
+    使用实际的NIfTI测试文件测试循环一致性
+    
+    读取 testdata/nifti/s0000.nii.gz，写出到临时文件，再读回来验证一致性
+    """
+    try:
+        import nibabel as nib
+    except ImportError:
+        pytest.skip("nibabel not installed, skipping NIfTI test")
+    
+    # 测试文件路径
+    nifti_test_file = "testdata/nifti/s0000.nii.gz"
+    
+    # 从测试文件读取
+    original_image = dicube.load_from_nifti(nifti_test_file)
+    
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # 输出到临时文件
+        nifti_path = os.path.join(temp_dir, "real_data_test.nii.gz")
+        
+        # 保存到新的NIfTI文件
+        dicube.save_to_nifti(original_image, nifti_path)
+        assert os.path.exists(nifti_path), "NIfTI file was not created"
+        
+        # 再次读取
+        loaded_image = dicube.load_from_nifti(nifti_path)
+        
+        # 保存到第三个文件以测试完整循环
+        nifti_path2 = os.path.join(temp_dir, "real_data_test2.nii.gz")
+        dicube.save_to_nifti(loaded_image, nifti_path2)
+        
+        # 再次读取
+        final_image = dicube.load_from_nifti(nifti_path2)
+        
+        # 验证像素数据一致性
+        assert original_image.raw_image.shape == final_image.raw_image.shape, "Shape mismatch"
+        assert np.array_equal(original_image.raw_image, final_image.raw_image), "Pixel data mismatch"
+        
+        # 验证空间信息一致性
+        assert original_image.space.shape == final_image.space.shape, "Space shape mismatch"
+        assert np.allclose(original_image.space.origin, final_image.space.origin, atol=1e-5), "Origin mismatch"
+        assert np.allclose(original_image.space.spacing, final_image.space.spacing, atol=1e-5), "Spacing mismatch"
+        assert np.allclose(original_image.space.to_nifti_affine(), final_image.space.to_nifti_affine(), atol=1e-5), "Affine mismatch"
+        
+        # 直接使用nibabel比较原始文件和最终文件的affine
+        nib_orig = nib.load(nifti_test_file)
+        nib_final = nib.load(nifti_path2)
+        assert np.allclose(nib_orig.affine, nib_final.affine, atol=1e-5), "NiBabel affine mismatch"
+        assert np.allclose(nib_orig.get_fdata(), nib_final.get_fdata(), atol=1e-5), "NiBabel data mismatch"
+        
+        
+        # 确认循环操作保持数据的一致性
+        assert np.array_equal(original_image.raw_image, final_image.raw_image), "DiCube round-trip data consistency failed" 
+
+
+def test_determine_optimal_nifti_dtype():
+    """
+    测试determine_optimal_nifti_dtype函数的数据类型选择逻辑
+    """
+    from dicube.storage.pixel_utils import determine_optimal_nifti_dtype
+    
+    # 测试不同类型的数据
+    
+    # 1. 小范围正整数 (应该选择uint8)
+    raw_data = np.array([0, 10, 20, 255], dtype=np.uint16)
+    header = PixelDataHeader(
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
+    )
+    data, dtype_name = determine_optimal_nifti_dtype(raw_data, header)
+    assert dtype_name == "uint8", "小范围正整数应该使用uint8"
+    assert data.dtype == np.uint8, "数据类型应该是uint8"
+    
+    # 2. 中等范围正整数 (应该选择uint16)
+    raw_data = np.array([0, 1000, 50000, 65535], dtype=np.uint16)
+    header = PixelDataHeader(
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
+    )
+    data, dtype_name = determine_optimal_nifti_dtype(raw_data, header)
+    assert dtype_name == "uint16", "中等范围正整数应该使用uint16"
+    assert data.dtype == np.uint16, "数据类型应该是uint16"
+    
+    # 3. 有负值的整数 (应该选择int16)
+    raw_data = np.array([100, 200, 300], dtype=np.uint16)
+    header = PixelDataHeader(
+        RescaleSlope=1.0,
+        RescaleIntercept=-1000.0,  # 应用后会有负值
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
+    )
+    data, dtype_name = determine_optimal_nifti_dtype(raw_data, header)
+    assert dtype_name == "int16", "带负值的数据应该使用int16"
+    assert data.dtype == np.int16, "数据类型应该是int16"
+    assert np.allclose(data, np.array([-900, -800, -700], dtype=np.int16)), "应用重缩放后的数据不正确"
+    
+    # 4. 浮点数据 (应该选择float32)
+    raw_data = np.array([100, 200, 300], dtype=np.uint16)
+    header = PixelDataHeader(
+        RescaleSlope=0.5,  # 非整数斜率
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="uint16",
+        PixelDtype="uint16"
+    )
+    data, dtype_name = determine_optimal_nifti_dtype(raw_data, header)
+    assert dtype_name == "float32", "非整数值应该使用float32"
+    assert data.dtype == np.float32, "数据类型应该是float32"
+    assert np.allclose(data, np.array([50.0, 100.0, 150.0], dtype=np.float32)), "应用重缩放后的浮点数据不正确"
+    
+    # 5. 大数值范围 (应该选择int32)
+    raw_data = np.array([1000000, 2000000, 3000000], dtype=np.int32)
+    header = PixelDataHeader(
+        RescaleSlope=1.0,
+        RescaleIntercept=0.0,
+        OriginalPixelDtype="int32",
+        PixelDtype="int32"
+    )
+    data, dtype_name = determine_optimal_nifti_dtype(raw_data, header)
+    assert dtype_name == "int32", "大范围整数应该使用int32"
+    assert data.dtype == np.int32, "数据类型应该是int32" 
