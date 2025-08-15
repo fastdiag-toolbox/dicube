@@ -5,6 +5,17 @@ DiCube is a Python library for efficient storage and processing of 3D medical im
 ## Install
 `pip install dicube`
 
+### From Source (with Submodules)
+```bash
+# Clone the repository with submodules
+git clone --recursive https://github.com/fastdiag-toolbox/dicube.git
+pip install -e .
+
+# Or if you've already cloned without submodules
+cd dicube
+git submodule update --init --recursive
+```
+
 ## Overview
 
 DiCube was extracted from the larger DICOMCube project to focus specifically on medical image storage. It works alongside:
