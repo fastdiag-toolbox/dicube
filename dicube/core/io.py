@@ -337,11 +337,16 @@ class DicomCubeImageIO:
         
         try:
             nii = nib.load(file_path)
+            nii_arr = np.asarray(nii.dataobj, dtype=nii.dataobj.dtype) 
             space = get_space_from_nifti(nii)
+            if nii_arr.flags.fortran:   
+                # this is fortran-order, need to convert to c-order
+                nii_arr = nii_arr.transpose(2, 1, 0)
+                space = space.reverse_axis_order() # adapt for transpose of nii_arr
             
             # Fix numpy array warning
             raw_image, header = derive_pixel_header_from_array(
-                np.asarray(nii.dataobj, dtype=nii.dataobj.dtype)
+                nii_arr
             )
             
             # Use lazy import to avoid circular dependency
@@ -417,10 +422,10 @@ class DicomCubeImageIO:
                 )
             
             # Get affine matrix from space
-            affine = image.space.to_nifti_affine()
+            affine = image.space.reverse_axis_order().to_nifti_affine()
             
             # 根据像素数据和metadata确定最佳的数据类型
-            optimal_data, dtype_name = determine_optimal_nifti_dtype(image.raw_image, image.pixel_header)
+            optimal_data, dtype_name = determine_optimal_nifti_dtype(image.raw_image.transpose(2, 1, 0), image.pixel_header)
             
             # Create NIfTI image with optimized data type
             nii = nib.Nifti1Image(optimal_data, affine)
