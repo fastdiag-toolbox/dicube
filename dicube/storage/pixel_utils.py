@@ -1,4 +1,5 @@
 from typing import Tuple
+import warnings
 
 import numpy as np
 
@@ -6,18 +7,21 @@ from ..core.pixel_header import PixelDataHeader
 
 
 def derive_pixel_header_from_array(
-    image: np.ndarray, preferred_dtype=np.uint16
+    image: np.ndarray, preferred_dtype="uint16", support_negative=True
 ) -> Tuple[np.ndarray, PixelDataHeader]:
     """Derive pixel data header information from input numpy array.
 
     Process different data types in different ways:
     - For unsigned integers (uint8/16/32): use raw data directly
-    - For signed integers (int8/16/32): convert to unsigned and record offset
-    - For floating point (float16/32/64): normalize to specified unsigned integer range
+    - For signed integers (int8/16/32): if support_negative is True, keep as-is; 
+      otherwise convert to unsigned and record offset
+    - For floating point (float16/32/64): try lossless int conversion first,
+      otherwise normalize to specified unsigned integer range
 
-    Args:
+            Args:
         image (np.ndarray): Input image array.
-        preferred_dtype (np.dtype): Preferred output data type. Defaults to np.uint16.
+        preferred_dtype (str): Preferred output data type. Defaults to "uint16".
+        support_negative (bool): Whether to support negative values directly. Defaults to True.
 
     Returns:
         Tuple[np.ndarray, PixelDataHeader]: A tuple containing:
@@ -36,34 +40,60 @@ def derive_pixel_header_from_array(
             PixelDtype=dtype,
             OriginalPixelDtype=dtype,
         )
-    elif image.dtype == np.int16:
-        min_val = int(np.min(image))
-        image = (image - min_val).astype("uint16")
-        return image, PixelDataHeader(
-            RescaleSlope=1,
-            RescaleIntercept=min_val,
-            PixelDtype="uint16",
-            OriginalPixelDtype=dtype,
-        )
-    elif image.dtype == np.int8:
-        min_val = int(np.min(image))
-        image = (image - min_val).astype("uint8")
-        return image, PixelDataHeader(
-            RescaleSlope=1,
-            RescaleIntercept=min_val,
-            PixelDtype="uint8",
-            OriginalPixelDtype=dtype,
-        )
-    elif image.dtype == np.int32:
-        min_val = int(np.min(image))
-        image = (image - min_val).astype("uint32")
-        return image, PixelDataHeader(
-            RescaleSlope=1,
-            RescaleIntercept=min_val,
-            PixelDtype="uint32",
-            OriginalPixelDtype=dtype,
-        )
+    elif image.dtype in (np.int8, np.int16, np.int32):
+        if support_negative:
+            # Directly use signed integer types without offset
+            return image, PixelDataHeader(
+                RescaleSlope=1,
+                RescaleIntercept=0,  # Important: no offset needed
+                PixelDtype=dtype,
+                OriginalPixelDtype=dtype,
+            )
+        else:
+            # Legacy mode: convert to unsigned with offset
+            if image.dtype == np.int16:
+                min_val = int(np.min(image))
+                image = (image - min_val).astype("uint16")
+                return image, PixelDataHeader(
+                    RescaleSlope=1,
+                    RescaleIntercept=min_val,
+                    PixelDtype="uint16",
+                    OriginalPixelDtype=dtype,
+                )
+            elif image.dtype == np.int8:
+                min_val = int(np.min(image))
+                image = (image - min_val).astype("uint8")
+                return image, PixelDataHeader(
+                    RescaleSlope=1,
+                    RescaleIntercept=min_val,
+                    PixelDtype="uint8",
+                    OriginalPixelDtype=dtype,
+                )
+            elif image.dtype == np.int32:
+                min_val = int(np.min(image))
+                image = (image - min_val).astype("uint32")
+                return image, PixelDataHeader(
+                    RescaleSlope=1,
+                    RescaleIntercept=min_val,
+                    PixelDtype="uint32",
+                    OriginalPixelDtype=dtype,
+                )
     elif image.dtype in (np.float16, np.float32, np.float64):
+        # Check if lossless int conversion is possible
+        if is_lossless_int_convertible(image):
+            try:
+                int_image, int_dtype = convert_to_minimal_int(image)
+                return int_image, PixelDataHeader(
+                    RescaleSlope=1.0,
+                    RescaleIntercept=0.0,
+                    PixelDtype=int_dtype,
+                    OriginalPixelDtype=dtype,
+                )
+            except ValueError:
+                # Fall through to float handling if conversion fails
+                pass
+        
+        # Handle as true floating point data
         if preferred_dtype == "uint8":
             dtype_max = 255
         elif preferred_dtype == "uint16":
@@ -86,9 +116,9 @@ def derive_pixel_header_from_array(
             raw_image = np.zeros_like(image, dtype=preferred_dtype)
             return raw_image, header
         else:
-            slope = float(max_val - min_val)
+            slope = float(max_val - min_val) / dtype_max
             intercept = float(min_val)
-            raw_image = ((image - intercept) / slope * dtype_max).astype(
+            raw_image = ((image - intercept) / slope).astype(
                 preferred_dtype
             )
             header = PixelDataHeader(
@@ -256,4 +286,77 @@ def determine_optimal_nifti_dtype(
             # 整数类型，先做浮点运算再转换
             result = (image.astype(np.float32) * slope + intercept).astype(result_dtype)
         
-        return result, result_dtype_name 
+        return result, result_dtype_name
+
+
+def is_lossless_int_convertible(arr: np.ndarray) -> bool:
+    """Check if a floating point array can be losslessly converted to integers.
+    
+    Args:
+        arr (np.ndarray): Input array to check.
+        
+    Returns:
+        bool: True if array contains only integer values, False otherwise.
+        
+    Example:
+        >>> arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        >>> is_lossless_int_convertible(arr)
+        True
+        >>> arr = np.array([1.0, 2.5, 3.0], dtype=np.float32)
+        >>> is_lossless_int_convertible(arr)
+        False
+    """
+    try:
+        # 检查是否所有值都是整数，同时处理可能的溢出
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            return np.all(arr == arr.astype(np.int64).astype(arr.dtype))
+    except (OverflowError, ValueError):
+        return False
+
+
+def convert_to_minimal_int(arr: np.ndarray) -> Tuple[np.ndarray, str]:
+    """Convert array to the minimal sufficient integer type.
+    
+    Selects the smallest integer type that can represent all values in the array.
+    Considers both signed and unsigned types.
+    
+    Args:
+        arr (np.ndarray): Input array to convert.
+        
+    Returns:
+        Tuple[np.ndarray, str]:
+            - The array converted to the optimal integer type
+            - The name of the chosen data type as a string
+            
+    Raises:
+        ValueError: If the value range is too large for any integer type.
+        
+    Example:
+        >>> arr = np.array([-10, 0, 100], dtype=np.float32)
+        >>> result, dtype_name = convert_to_minimal_int(arr)
+        >>> print(result.dtype, dtype_name)
+        int8 int8
+    """
+    min_val, max_val = arr.min(), arr.max()
+    
+    # If all values are non-negative, prefer unsigned types
+    if min_val >= 0:
+        for dtype, max_range in [
+            (np.uint8, 255),
+            (np.uint16, 65535),
+            (np.uint32, 4294967295),
+        ]:
+            if max_val <= max_range:
+                return arr.astype(dtype), dtype.__name__
+    
+    # For negative values or large positive values, use signed types
+    for dtype, (low, high) in [
+        (np.int8, (-128, 127)),
+        (np.int16, (-32768, 32767)),
+        (np.int32, (-2147483648, 2147483647)),
+    ]:
+        if low <= min_val and max_val <= high:
+            return arr.astype(dtype), dtype.__name__
+    
+    raise ValueError(f"Value range [{min_val}, {max_val}] too large for any integer type") 

@@ -17,7 +17,7 @@ from pydicom.uid import generate_uid
 import pydicom
 
 from ..storage.dcb_file import DcbFile
-from .dicom_io import save_dicom
+from .dicom_io import save_dicom, create_dicom_dataset
 
 # Required minimum PyDicom version
 REQUIRED_PYDICOM_VERSION = "3.0.0"
@@ -171,37 +171,17 @@ class DcbStreamingReader:
         return self.file_handle.read(length)
     
     def _create_dicom_dataset(self, frame_index: int, encoded_data: bytes) -> Dataset:
-        """Quickly create DICOM Dataset."""
-        # 1. Get metadata for the frame from cached DicomMeta
+        """Quickly create DICOM Dataset using unified creation function."""
+        # Get metadata for the frame from cached DicomMeta
         if self.dicom_meta:
             frame_meta_dict = self.dicom_meta.index(frame_index)
         else:
             frame_meta_dict = {}
         
-        # 2. Create Dataset
-        ds = Dataset.from_json(frame_meta_dict)
+        # Create dataset using unified function
+        ds = create_dicom_dataset(frame_meta_dict, self.pixel_header, self.transfer_syntax_uid)
         
-        # 3. Create and set file metadata
-        file_meta = FileMetaDataset()
-        file_meta.MediaStorageSOPClassUID = ds.get('SOPClassUID', '1.2.840.10008.5.1.4.1.1.2')
-        file_meta.MediaStorageSOPInstanceUID = ds.get('SOPInstanceUID', generate_uid())
-        file_meta.TransferSyntaxUID = self.transfer_syntax_uid
-        file_meta.ImplementationClassUID = generate_uid()
-        
-        ds.file_meta = file_meta
-        
-        # 4. Ensure necessary SOP information
-        if not hasattr(ds, 'SOPClassUID'):
-            ds.SOPClassUID = file_meta.MediaStorageSOPClassUID
-        if not hasattr(ds, 'SOPInstanceUID'):
-            ds.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
-        
-        # 5. Set pixel-related attributes
-        if self.pixel_header:
-            ds.RescaleSlope = self.pixel_header.RescaleSlope
-            ds.RescaleIntercept = self.pixel_header.RescaleIntercept
-        
-        # 6. Set pixel data (using encapsulated format for compressed data)
+        # Set pixel data (using encapsulated format for compressed data)
         ds.PixelData = encapsulate([encoded_data])
         
         return ds

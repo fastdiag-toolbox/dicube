@@ -220,10 +220,30 @@ class DicomCubeImage:
         # Pixel characteristics
         meta.set_shared_item(CommonTags.SamplesPerPixel, 1)
         meta.set_shared_item(CommonTags.PhotometricInterpretation, "MONOCHROME2")
-        meta.set_shared_item(CommonTags.BitsAllocated, 16)
-        meta.set_shared_item(CommonTags.BitsStored, 16)
-        meta.set_shared_item(CommonTags.HighBit, 15)
-        meta.set_shared_item(CommonTags.PixelRepresentation, 0)
+        
+        # Dynamically set bit-related fields based on pixel data type
+        pixel_dtype = self.pixel_header.PixelDtype
+        
+        # Determine bits based on data type
+        dtype_to_bits = {
+            "uint8": (8, 8, 7),
+            "int8": (8, 8, 7),
+            "uint16": (16, 16, 15),
+            "int16": (16, 16, 15),
+            "uint32": (32, 32, 31),
+            "int32": (32, 32, 31),
+        }
+        
+        bits_allocated, bits_stored, high_bit = dtype_to_bits.get(pixel_dtype, (16, 16, 15))
+        meta.set_shared_item(CommonTags.BitsAllocated, bits_allocated)
+        meta.set_shared_item(CommonTags.BitsStored, bits_stored)
+        meta.set_shared_item(CommonTags.HighBit, high_bit)
+        
+        # Set PixelRepresentation based on signedness
+        if pixel_dtype in ("int8", "int16", "int32"):
+            meta.set_shared_item(CommonTags.PixelRepresentation, 1)  # signed
+        else:
+            meta.set_shared_item(CommonTags.PixelRepresentation, 0)  # unsigned
 
         # Rescale Information from pixel_header
         if self.pixel_header.RescaleSlope is not None:

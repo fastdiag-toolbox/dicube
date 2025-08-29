@@ -216,7 +216,10 @@ def test_dcb_streaming_pixel_data_integrity(dicom_folder_path, dcbs_file):
             # Compare other important DICOM attributes (exclude dynamically generated attributes)
             exclude_attrs = [
                 'file_meta', 'is_little_endian', 'is_implicit_VR',
-                'SOPInstanceUID'  # This might be regenerated
+                'SOPInstanceUID',  # This might be regenerated
+                'PixelRepresentation',  # May change due to data type optimization
+                'BitsAllocated', 'BitsStored', 'HighBit',  # May change due to data type optimization
+                'RescaleSlope', 'RescaleIntercept',  # May change due to data optimization
             ]
             
             for attr in original_ds.dir():

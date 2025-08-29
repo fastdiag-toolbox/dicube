@@ -57,37 +57,65 @@ def ensure_required_tags(ds):
         ds.SOPInstanceUID = ds.file_meta.MediaStorageSOPInstanceUID
 
 
-def set_dicom_pixel_attributes(img, ds):
-    """Set DICOM pixel attributes"""
-    if np.issubdtype(img.dtype, np.integer):
-        bits = img.dtype.itemsize * 8
-        ds.BitsAllocated = bits
-        ds.BitsStored = bits
-        ds.HighBit = bits - 1
-        ds.PixelRepresentation = 1 if np.issubdtype(img.dtype, np.signedinteger) else 0
-    else:
-        warnings.warn(f"Converting float dtype {img.dtype} to uint16")
-        img = img.astype(np.uint16)
-        ds.BitsAllocated = 16
-        ds.BitsStored = 16
-        ds.HighBit = 15
-        ds.PixelRepresentation = 0
-
-    ds.SamplesPerPixel = 1
-    return img
 
 
-def create_dicom_dataset(meta_dict: dict, pixel_header):
-    """Create DICOM dataset"""
+
+def set_pixel_data_attributes(ds: Dataset, pixel_header):
+    """Set pixel data attributes based on pixel header information.
+    
+    Args:
+        ds (Dataset): DICOM dataset to update
+        pixel_header: Pixel header containing data type information
+    """
+    if pixel_header:
+        ds.RescaleSlope = pixel_header.RescaleSlope
+        ds.RescaleIntercept = pixel_header.RescaleIntercept
+        
+        # Set correct pixel data attributes based on pixel_header
+        pixel_dtype = pixel_header.PixelDtype
+        
+        # Determine bits based on data type
+        dtype_to_bits = {
+            "uint8": (8, 8, 7, 0),
+            "int8": (8, 8, 7, 1),
+            "uint16": (16, 16, 15, 0),
+            "int16": (16, 16, 15, 1),
+            "uint32": (32, 32, 31, 0),
+            "int32": (32, 32, 31, 1),
+        }
+        
+        bits_allocated, bits_stored, high_bit, pixel_rep = dtype_to_bits.get(pixel_dtype, (16, 16, 15, 0))
+        ds.BitsAllocated = bits_allocated
+        ds.BitsStored = bits_stored
+        ds.HighBit = high_bit
+        ds.PixelRepresentation = pixel_rep
+        ds.SamplesPerPixel = 1
+        ds.PhotometricInterpretation = "MONOCHROME2"
+
+
+def create_dicom_dataset(meta_dict: dict, pixel_header, transfer_syntax_uid=None):
+    """Create DICOM dataset with unified pixel attribute handling.
+    
+    Args:
+        meta_dict: Metadata dictionary for the dataset
+        pixel_header: Pixel header containing data type information
+        transfer_syntax_uid: Optional transfer syntax UID (defaults to ExplicitVRLittleEndian)
+    """
     ds = Dataset.from_json(meta_dict)
 
     if hasattr(ds, "file_meta"):
         warnings.warn("Found original file metadata, will be overridden")
 
-    ds.file_meta = create_file_meta(ds)
+    # Create file metadata
+    file_meta = create_file_meta(ds)
+    if transfer_syntax_uid:
+        file_meta.TransferSyntaxUID = transfer_syntax_uid
+    ds.file_meta = file_meta
+    
     ensure_required_tags(ds)
-    ds.RescaleSlope = pixel_header.RescaleSlope
-    ds.RescaleIntercept = pixel_header.RescaleIntercept
+    
+    # Set unified pixel data attributes
+    set_pixel_data_attributes(ds, pixel_header)
 
     return ds
 
@@ -139,11 +167,14 @@ def save_to_dicom_folder(
         raw_images = raw_images[np.newaxis, ...]
 
     for idx in range(len(raw_images)):
+        # Create dataset with unified pixel attribute handling
         ds = create_dicom_dataset(dicom_meta.index(idx), pixel_header)
         img = raw_images[idx]
 
-        if img.dtype != np.uint16:
-            img = set_dicom_pixel_attributes(img, ds)
+        # Ensure image data type matches pixel header expectations
+        target_dtype = getattr(np, pixel_header.PixelDtype, img.dtype)
+        if img.dtype != target_dtype:
+            img = img.astype(target_dtype)
 
         ds.PixelData = img.tobytes()
 

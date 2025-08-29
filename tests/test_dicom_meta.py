@@ -77,7 +77,7 @@ def test_dicom_json_convert(dicom_files, dicom_meta):
     json_convert = pydicom.dcmread(dicom_files[0]).to_json_dict(
         bulk_data_threshold=10240, bulk_data_element_handler=lambda x: None
     )
-    json_convert.pop('7FE00010') # remove pixel data
+    json_convert.pop('7FE00010', None) # remove pixel data
     assert (
         json_convert == json_back
     ), "read dicom json different from json convert from dicommeta."

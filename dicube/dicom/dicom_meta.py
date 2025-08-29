@@ -391,7 +391,10 @@ class DicomMeta:
             tag_input: The tag to retrieve, can be a Tag object, string, or (group, element) tuple
         
         Returns:
-            Any: The shared value if tag is shared, None if not shared or missing
+            Any: The shared value if tag is shared, None if missing
+
+        Raises:
+            ValueError: If the tag is not shared
         """
         tag = Tag(tag_input)
         tag_key = get_tag_key(tag)
@@ -406,8 +409,8 @@ class DicomMeta:
             if isinstance(value, list) and len(value) == 1:
                 return value[0]
             return value
-            
-        return None
+        else:
+            raise ValueError(f"Tag {tag_input} is not shared")
 
 
     def get_vr(self, tag_input: Union[str, Tag, Tuple[int, int]]) -> str:

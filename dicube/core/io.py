@@ -229,22 +229,54 @@ class DicomCubeImageIO:
         try:
             # Read DICOM folder
             meta, datasets = read_dicom_dir(folder_path, sort_method=sort_method)
-            images = [d.pixel_array for d in datasets]
-            status = get_dicom_status(meta)
             
-            if status in (
-                DicomStatus.NON_UNIFORM_RESCALE_FACTOR,
-                DicomStatus.MISSING_DTYPE,
-                DicomStatus.NON_UNIFORM_DTYPE,
-                DicomStatus.MISSING_SHAPE,
-                DicomStatus.INCONSISTENT,
-            ):
-                raise MetaDataError(
-                    f"Unsupported DICOM status: {status}",
-                    context="load_from_dicom_folder operation",
-                    details={"dicom_status": status, "folder_path": folder_path},
-                    suggestion="Ensure DICOM files have consistent metadata and proper format"
-                )
+            # Get slopes and intercepts for all slices (handles both shared and non-shared)
+            slopes = meta.get_values(CommonTags.RescaleSlope)
+            intercepts = meta.get_values(CommonTags.RescaleIntercept)
+            
+            # Process each image with its corresponding slope/intercept
+            real_values = []
+            for i, ds in enumerate(datasets):
+                img = ds.pixel_array
+                
+                # Get slope and intercept for this slice (handle None values and lists safely)
+                slope_val = slopes[i] if i < len(slopes) else None
+                intercept_val = intercepts[i] if i < len(intercepts) else None
+                
+                # Handle case where values might be lists (DICOM multi-value fields)
+                if slope_val is not None:
+                    if isinstance(slope_val, list) and len(slope_val) > 0:
+                        slope = float(slope_val[0])
+                    else:
+                        slope = float(slope_val)
+                else:
+                    slope = 1.0
+                    
+                if intercept_val is not None:
+                    if isinstance(intercept_val, list) and len(intercept_val) > 0:
+                        intercept = float(intercept_val[0])
+                    else:
+                        intercept = float(intercept_val)
+                else:
+                    intercept = 0.0
+                
+                # Apply transformation (optimize: skip multiplication if slope=1)
+                if slope == 1.0:
+                    if intercept != 0.0:
+                        real_val = img + intercept
+                    else:
+                        real_val = img
+                else:
+                    real_val = img * slope + intercept
+                
+                real_values.append(real_val)
+            
+            # Stack and regenerate pixel header with unified storage
+            stacked_array = np.stack(real_values)
+            raw_image, pixel_header = derive_pixel_header_from_array(stacked_array)
+            
+            # Get DICOM status for space calculation
+            status = get_dicom_status(meta)
             
             if status in (
                 DicomStatus.MISSING_SPACING,
@@ -264,27 +296,20 @@ class DicomCubeImageIO:
                 else:
                     space = None
             
-            # Get rescale parameters
-            slope = meta.get_shared_value(CommonTags.RescaleSlope)
-            intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
-            wind_center = meta.get_shared_value(CommonTags.WindowCenter)
-            wind_width = meta.get_shared_value(CommonTags.WindowWidth)
+            # Get window center/width if available
+            wind_center = meta.get_shared_value(CommonTags.WindowCenter) if meta.is_shared(CommonTags.WindowCenter) else None
+            wind_width = meta.get_shared_value(CommonTags.WindowWidth) if meta.is_shared(CommonTags.WindowWidth) else None
+            
             try:
-                wind_center = float(wind_center)
-                wind_width = float(wind_width)
+                wind_center = float(wind_center) if wind_center is not None else None
+                wind_width = float(wind_width) if wind_width is not None else None
             except:
                 wind_center = None
                 wind_width = None
             
-            # Create pixel_header
-            pixel_header = PixelDataHeader(
-                RescaleSlope=float(slope) if slope is not None else 1.0,
-                RescaleIntercept=float(intercept) if intercept is not None else 0.0,
-                OriginalPixelDtype=str(images[0].dtype),
-                PixelDtype=str(images[0].dtype),
-                WindowCenter=wind_center,
-                WindowWidth=wind_width,
-            )
+            # Update pixel_header with window values
+            pixel_header.WindowCenter = wind_center
+            pixel_header.WindowWidth = wind_width
             
             # Validate PixelDataHeader initialization success
             if pixel_header is None:
@@ -298,7 +323,7 @@ class DicomCubeImageIO:
             from .image import DicomCubeImage
             
             return DicomCubeImage(
-                raw_image=np.array(images),
+                raw_image=raw_image,
                 pixel_header=pixel_header,
                 dicom_meta=meta,
                 space=space,

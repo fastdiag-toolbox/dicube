@@ -110,7 +110,12 @@ def test_dicom_cube_image_to_dicom_folder():
         # 读回验证
         image_back = dicube.load_from_dicom_folder(output_dir)
         assert image_back.shape == image.shape
-        assert np.array_equal(image_back.raw_image, image.raw_image)
+        
+        # 比较真实值（get_fdata），而不是存储格式（raw_image）
+        # 因为新的设计会将 intercept 应用到数据上，改变存储类型
+        original_real_values = image.get_fdata()
+        loaded_real_values = image_back.get_fdata()
+        assert np.allclose(original_real_values, loaded_real_values, rtol=1e-6)
 
 
 def test_dicom_cube_image_metadata():

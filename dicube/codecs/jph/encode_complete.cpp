@@ -108,11 +108,14 @@ py::bytes encode_image(py::array image,
     // 同时支持带字节序前缀的格式（如 "<H", ">H", "=H" 等）
     std::string format = buf.format;
     bool is_uint8 = (format == "B" || format == "<B" || format == ">B" || format == "=B");
+    bool is_int8 = (format == "b" || format == "<b" || format == ">b" || format == "=b");
     bool is_uint16 = (format == "H" || format == "<H" || format == ">H" || format == "=H");
     bool is_int16 = (format == "h" || format == "<h" || format == ">h" || format == "=h");
+    bool is_uint32 = (format == "I" || format == "<I" || format == ">I" || format == "=I");
+    bool is_int32 = (format == "i" || format == "<i" || format == ">i" || format == "=i");
     
-    if (!is_uint8 && !is_uint16 && !is_int16)
-        throw std::runtime_error("Unsupported dtype. Only uint8, uint16, and int16 are supported.");
+    if (!is_uint8 && !is_int8 && !is_uint16 && !is_int16 && !is_uint32 && !is_int32)
+        throw std::runtime_error("Unsupported dtype. Only uint8, int8, uint16, int16, uint32, and int32 are supported.");
 
     // 创建输出内存文件
     MemOutfile outfile;
@@ -131,10 +134,16 @@ py::bytes encode_image(py::array image,
     for (int c = 0; c < num_components; c++) {
         if (is_uint8)
             siz.set_component(c, point(1, 1), 8, false);
+        else if (is_int8)
+            siz.set_component(c, point(1, 1), 8, true);
         else if (is_uint16)
             siz.set_component(c, point(1, 1), 16, false);
         else if (is_int16)
             siz.set_component(c, point(1, 1), 16, true);
+        else if (is_uint32)
+            siz.set_component(c, point(1, 1), 32, false);
+        else if (is_int32)
+            siz.set_component(c, point(1, 1), 32, true);
     }
 
     // 设置 COD 参数
@@ -183,11 +192,20 @@ py::bytes encode_image(py::array image,
                     if (is_uint8) {
                         const uint8_t* src = reinterpret_cast<const uint8_t*>(row_ptr);
                         value = src[x * step];
+                    } else if (is_int8) {
+                        const int8_t* src = reinterpret_cast<const int8_t*>(row_ptr);
+                        value = src[x * step];
                     } else if (is_uint16) {
                         const uint16_t* src = reinterpret_cast<const uint16_t*>(row_ptr);
                         value = src[x * step];
                     } else if (is_int16) {
                         const int16_t* src = reinterpret_cast<const int16_t*>(row_ptr);
+                        value = src[x * step];
+                    } else if (is_uint32) {
+                        const uint32_t* src = reinterpret_cast<const uint32_t*>(row_ptr);
+                        value = src[x * step];
+                    } else if (is_int32) {
+                        const int32_t* src = reinterpret_cast<const int32_t*>(row_ptr);
                         value = src[x * step];
                     }
                     line->i32[x] = value;
