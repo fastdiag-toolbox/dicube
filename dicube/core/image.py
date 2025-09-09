@@ -170,7 +170,10 @@ class DicomCubeImage:
             meta.set_shared_item(
                 CommonTags.ImageOrientationPatient, list(orientation)
             )
-            meta.set_shared_item(CommonTags.PixelSpacing, list(self.space.spacing[:2]))
+            # Space class stores spacing as [X, Y, Z], but DICOM PixelSpacing expects [Y, X]
+            # So we need to swap the first two values when writing to DICOM
+            dicom_pixel_spacing = [self.space.spacing[1], self.space.spacing[0]]  # Convert [X, Y] to [Y, X]
+            meta.set_shared_item(CommonTags.PixelSpacing, dicom_pixel_spacing)
             meta.set_shared_item(
                 CommonTags.SliceThickness, float(self.space.spacing[2])
             )

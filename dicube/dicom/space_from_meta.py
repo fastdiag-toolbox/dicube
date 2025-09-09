@@ -31,6 +31,9 @@ def get_space_from_DicomMeta(meta, axis_order="xyz"):
         return None
     spacing = meta.get_shared_value(CommonTags.PixelSpacing)
     spacing = [float(s) for s in spacing]
+    # DICOM PixelSpacing is [row_spacing(Y), column_spacing(X)]
+    # But Space class expects [X, Y, Z] order, so we need to swap
+    spacing = [spacing[1], spacing[0]]  # Convert [Y, X] to [X, Y]
     positions = np.array(
         meta.get_values(CommonTags.ImagePositionPatient)
     )
