@@ -1,7 +1,8 @@
 """
 Unified DICOM Dataset Builder
 
-Provides a single, consistent interface for creating DICOM datasets from various sources.
+Provides a simple, efficient interface for creating DICOM datasets from various sources.
+Uses pydicom's built-in JSON conversion for maximum simplicity and reliability.
 """
 
 import io
@@ -13,8 +14,6 @@ from pydicom import Dataset
 from pydicom.dataset import FileMetaDataset
 from pydicom.encaps import encapsulate
 from pydicom.uid import ExplicitVRLittleEndian, generate_uid
-from pydicom.tag import Tag
-from pydicom.datadict import keyword_for_tag
 
 
 def create_file_meta(ds):
@@ -116,10 +115,12 @@ def save_dicom(ds: Dataset, output_path: str):
 class DicomBuilder:
     """Unified DICOM dataset builder for all scenarios.
     
-    This class provides a single interface for creating DICOM datasets from:
+    This class provides a simple interface for creating DICOM datasets from:
     - Raw pixel arrays (uncompressed)
     - Compressed pixel data (JPEG2000, HTJ2K, etc.)
     - With or without decompression
+    
+    Uses pydicom's built-in Dataset.from_json() for reliable metadata handling.
     """
     
     @staticmethod
@@ -134,7 +135,7 @@ class DicomBuilder:
         """Build a DICOM dataset from various input types.
         
         Args:
-            meta_dict: DICOM metadata dictionary
+            meta_dict: DICOM metadata dictionary (JSON format or dict)
             pixel_header: Pixel header with data type information
             pixel_data: Either raw numpy array or compressed bytes
             transfer_syntax_uid: Transfer syntax UID (defaults to ExplicitVRLittleEndian)
@@ -160,43 +161,19 @@ class DicomBuilder:
                                    force_uncompressed=True)
         """
         # Create base dataset
-        ds = Dataset()
-        # Set attributes from metadata dictionary
-        for key, value in meta_dict.items():
-            # Convert hex tag to keyword if needed
-            if isinstance(key, str) and len(key) == 8 and all(c in '0123456789ABCDEF' for c in key.upper()):
-                # This is a hex tag, convert to keyword
-                try:
-                    tag = Tag(key)
-                    keyword = keyword_for_tag(tag)
-                    if keyword:
-                        attr_name = keyword
-                    else:
-                        # Use the tag directly if no keyword found
-                        attr_name = key
-                except:
-                    attr_name = key
-            else:
-                attr_name = key
-            
-            if isinstance(value, dict) and 'vr' in value:
-                # This is DICOM JSON format, need to extract the actual value
-                if 'Value' in value and value['Value']:
-                    actual_value = value['Value']
-                    if isinstance(actual_value, list) and len(actual_value) == 1:
-                        # Single value, extract it
-                        if isinstance(actual_value[0], dict) and 'Alphabetic' in actual_value[0]:
-                            # Person name format
-                            setattr(ds, attr_name, actual_value[0]['Alphabetic'])
-                        else:
-                            setattr(ds, attr_name, actual_value[0])
-                    else:
-                        # Multiple values or other format
-                        setattr(ds, attr_name, actual_value)
-                # If no Value field, skip this element (empty element)
-            else:
-                # Regular value, set directly
-                setattr(ds, attr_name, value)
+        # Handle both DICOM JSON format and simple dictionary format
+        if DicomBuilder._is_dicom_json_format(meta_dict):
+            # DICOM JSON format with 'vr' and 'Value' keys
+            ds = Dataset.from_json(meta_dict)
+        else:
+            # Simple dictionary format - convert to dataset directly
+            ds = Dataset()
+            for key, value in meta_dict.items():
+                setattr(ds, key, value)
+        
+        # Handle any existing file metadata with warning
+        if hasattr(ds, "file_meta"):
+            warnings.warn("Found original file metadata, will be overridden")
         
         # Set file metadata
         file_meta = create_file_meta(ds)
@@ -245,6 +222,33 @@ class DicomBuilder:
         return ds
     
     @staticmethod
+    def _is_dicom_json_format(meta_dict: Dict[str, Any]) -> bool:
+        """Check if the metadata dictionary is in DICOM JSON format.
+        
+        DICOM JSON format has structure like:
+        {"00080005": {"vr": "CS", "Value": ["ISO_IR 100"]}}
+        
+        Simple format has structure like:
+        {"PatientName": "Test^Patient", "Modality": "CT"}
+        """
+        if not meta_dict:
+            return False
+            
+        # Check a few entries to determine format
+        sample_keys = list(meta_dict.keys())[:3]
+        for key in sample_keys:
+            value = meta_dict[key]
+            # DICOM JSON format: values are dicts with 'vr' key
+            if isinstance(value, dict) and 'vr' in value:
+                return True
+            # Simple format: values are direct values (str, int, etc.)
+            elif not isinstance(value, dict):
+                return False
+        
+        # If all values are dicts but no 'vr' found, assume simple format
+        return False
+    
+    @staticmethod
     def _decompress_pixel_data(
         compressed_data: bytes, 
         ds: Dataset,
@@ -265,7 +269,6 @@ class DicomBuilder:
             # Attempt decompression
             return temp_ds.pixel_array
         except Exception as e:
-            import warnings
             warnings.warn(f"Failed to decompress pixel data: {e}")
             return None
     
