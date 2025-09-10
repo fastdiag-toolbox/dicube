@@ -368,14 +368,12 @@ class DicomCubeImageIO:
     def save_to_dicom_folder(
         image: 'DicomCubeImage',
         folder_path: str,
-        force_uncompressed: bool = False,
     ) -> None:
         """Save DicomCubeImage as a DICOM folder.
         
         Args:
             image (DicomCubeImage): The DicomCubeImage object to save.
             folder_path (str): Output directory path.
-            force_uncompressed (bool): If True, save as uncompressed DICOM.
         """
         # Validate required parameters
         validate_not_none(image, "image", "save_to_dicom_folder operation", DataConsistencyError)
@@ -399,7 +397,6 @@ class DicomCubeImageIO:
                 pixel_header=image.pixel_header,
                 pixel_data=raw_images[idx],
                 is_compressed_data=False,
-                force_uncompressed=force_uncompressed
             )
 
             # Save to file
