@@ -133,14 +133,16 @@ def load_from_nifti(file_path: str) -> DicomCubeImage:
 def save_to_dicom_folder(
     image: DicomCubeImage,
     folder_path: str,
+    force_uncompressed: bool = False,
 ) -> None:
     """Save a DicomCubeImage as a DICOM folder.
     
     Args:
         image (DicomCubeImage): The image object to save.
         folder_path (str): Output directory path.
+        force_uncompressed (bool): If True, save as uncompressed DICOM.
     """
-    return DicomCubeImageIO.save_to_dicom_folder(image, folder_path)
+    return DicomCubeImageIO.save_to_dicom_folder(image, folder_path, force_uncompressed)
 
 
 def save_to_nifti(

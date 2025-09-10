@@ -1,5 +1,6 @@
 import struct
 import warnings
+import os
 from typing import Optional, Union
 
 import numpy as np
@@ -14,7 +15,7 @@ from ..dicom import (
     read_dicom_dir,
     get_space_from_DicomMeta,
 )
-from ..dicom.dicom_io import save_to_dicom_folder
+from ..dicom.dicom_builder import DicomBuilder, save_dicom
 from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
 from ..storage.pixel_utils import derive_pixel_header_from_array, determine_optimal_nifti_dtype
 from .pixel_header import PixelDataHeader
@@ -229,54 +230,22 @@ class DicomCubeImageIO:
         try:
             # Read DICOM folder
             meta, datasets = read_dicom_dir(folder_path, sort_method=sort_method)
-            
-            # Get slopes and intercepts for all slices (handles both shared and non-shared)
-            slopes = meta.get_values(CommonTags.RescaleSlope)
-            intercepts = meta.get_values(CommonTags.RescaleIntercept)
-            
-            # Process each image with its corresponding slope/intercept
-            real_values = []
-            for i, ds in enumerate(datasets):
-                img = ds.pixel_array
-                
-                # Get slope and intercept for this slice (handle None values and lists safely)
-                slope_val = slopes[i] if i < len(slopes) else None
-                intercept_val = intercepts[i] if i < len(intercepts) else None
-                
-                # Handle case where values might be lists (DICOM multi-value fields)
-                if slope_val is not None:
-                    if isinstance(slope_val, list) and len(slope_val) > 0:
-                        slope = float(slope_val[0])
-                    else:
-                        slope = float(slope_val)
-                else:
-                    slope = 1.0
-                    
-                if intercept_val is not None:
-                    if isinstance(intercept_val, list) and len(intercept_val) > 0:
-                        intercept = float(intercept_val[0])
-                    else:
-                        intercept = float(intercept_val)
-                else:
-                    intercept = 0.0
-                
-                # Apply transformation (optimize: skip multiplication if slope=1)
-                if slope == 1.0:
-                    if intercept != 0.0:
-                        real_val = img + intercept
-                    else:
-                        real_val = img
-                else:
-                    real_val = img * slope + intercept
-                
-                real_values.append(real_val)
-            
-            # Stack and regenerate pixel header with unified storage
-            stacked_array = np.stack(real_values)
-            raw_image, pixel_header = derive_pixel_header_from_array(stacked_array)
-            
-            # Get DICOM status for space calculation
+            images = [d.pixel_array for d in datasets]
             status = get_dicom_status(meta)
+            
+            if status in (
+                DicomStatus.NON_UNIFORM_RESCALE_FACTOR,
+                DicomStatus.MISSING_DTYPE,
+                DicomStatus.NON_UNIFORM_DTYPE,
+                DicomStatus.MISSING_SHAPE,
+                DicomStatus.INCONSISTENT,
+            ):
+                raise MetaDataError(
+                    f"Unsupported DICOM status: {status}",
+                    context="load_from_dicom_folder operation",
+                    details={"dicom_status": status, "folder_path": folder_path},
+                    suggestion="Ensure DICOM files have consistent metadata and proper format"
+                )
             
             if status in (
                 DicomStatus.MISSING_SPACING,
@@ -296,20 +265,27 @@ class DicomCubeImageIO:
                 else:
                     space = None
             
-            # Get window center/width if available
-            wind_center = meta.get_shared_value(CommonTags.WindowCenter) if meta.is_shared(CommonTags.WindowCenter) else None
-            wind_width = meta.get_shared_value(CommonTags.WindowWidth) if meta.is_shared(CommonTags.WindowWidth) else None
-            
+            # Get rescale parameters
+            slope = meta.get_shared_value(CommonTags.RescaleSlope)
+            intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
+            wind_center = meta.get_shared_value(CommonTags.WindowCenter)
+            wind_width = meta.get_shared_value(CommonTags.WindowWidth)
             try:
-                wind_center = float(wind_center) if wind_center is not None else None
-                wind_width = float(wind_width) if wind_width is not None else None
+                wind_center = float(wind_center)
+                wind_width = float(wind_width)
             except:
                 wind_center = None
                 wind_width = None
             
-            # Update pixel_header with window values
-            pixel_header.WindowCenter = wind_center
-            pixel_header.WindowWidth = wind_width
+            # Create pixel_header
+            pixel_header = PixelDataHeader(
+                RescaleSlope=float(slope) if slope is not None else 1.0,
+                RescaleIntercept=float(intercept) if intercept is not None else 0.0,
+                OriginalPixelDtype=str(images[0].dtype),
+                PixelDtype=str(images[0].dtype),
+                WindowCenter=wind_center,
+                WindowWidth=wind_width,
+            )
             
             # Validate PixelDataHeader initialization success
             if pixel_header is None:
@@ -323,7 +299,7 @@ class DicomCubeImageIO:
             from .image import DicomCubeImage
             
             return DicomCubeImage(
-                raw_image=raw_image,
+                raw_image=np.array(images),
                 pixel_header=pixel_header,
                 dicom_meta=meta,
                 space=space,
@@ -392,12 +368,14 @@ class DicomCubeImageIO:
     def save_to_dicom_folder(
         image: 'DicomCubeImage',
         folder_path: str,
+        force_uncompressed: bool = False,
     ) -> None:
         """Save DicomCubeImage as a DICOM folder.
         
         Args:
             image (DicomCubeImage): The DicomCubeImage object to save.
             folder_path (str): Output directory path.
+            force_uncompressed (bool): If True, save as uncompressed DICOM.
         """
         # Validate required parameters
         validate_not_none(image, "image", "save_to_dicom_folder operation", DataConsistencyError)
@@ -407,12 +385,28 @@ class DicomCubeImageIO:
             warnings.warn("dicom_meta is None, initializing with default values")
             image.init_meta()
         
-        save_to_dicom_folder(
-            raw_images=image.raw_image,
-            dicom_meta=image.dicom_meta,
-            pixel_header=image.pixel_header,
-            output_dir=folder_path,
-        ) 
+        # Prepare output directory
+        prepare_output_dir(folder_path)
+
+        raw_images = image.raw_image
+        if raw_images.ndim == 2:
+            raw_images = raw_images[np.newaxis, ...]
+        
+        for idx in range(len(raw_images)):
+            # Build DICOM dataset using unified builder
+            ds = DicomBuilder.build(
+                meta_dict=image.dicom_meta.index(idx),
+                pixel_header=image.pixel_header,
+                pixel_data=raw_images[idx],
+                is_compressed_data=False,
+                force_uncompressed=force_uncompressed
+            )
+
+            # Save to file
+            output_path = os.path.join(
+                folder_path, f"slice_{idx:04d}.dcm"
+            )
+            save_dicom(ds, output_path) 
         
     @staticmethod
     def save_to_nifti(
@@ -465,4 +459,14 @@ class DicomCubeImageIO:
                 context="save_to_nifti operation",
                 details={"file_path": file_path},
                 suggestion="Check file permissions and ensure space information is valid"
-            ) from e 
+            ) from e
+
+
+def prepare_output_dir(output_dir: str):
+    """Prepare output directory"""
+    if os.path.exists(output_dir):
+        import shutil
+
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir, exist_ok=True)
+
