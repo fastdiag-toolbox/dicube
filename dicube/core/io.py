@@ -268,14 +268,31 @@ class DicomCubeImageIO:
             # Get rescale parameters
             slope = meta.get_shared_value(CommonTags.RescaleSlope)
             intercept = meta.get_shared_value(CommonTags.RescaleIntercept)
-            wind_center = meta.get_shared_value(CommonTags.WindowCenter)
-            wind_width = meta.get_shared_value(CommonTags.WindowWidth)
-            try:
-                wind_center = float(wind_center)
-                wind_width = float(wind_width)
-            except:
-                wind_center = None
-                wind_width = None
+            
+            # Get window parameters with fallback for non-shared values
+            def get_window_value(tag):
+                try:
+                    return meta.get_shared_value(tag)
+                except ValueError:
+                    # Not shared, use first slice value
+                    if not meta.is_missing(tag):
+                        values = meta.get_values(tag)
+                        return values[0] if values else None
+                    return None
+            
+            def normalize_window_value(value):
+                if value is None:
+                    return None
+                try:
+                    # Handle multi-value arrays (e.g., [40.0, 40.0])
+                    if isinstance(value, (list, tuple)) and len(value) > 0:
+                        return float(value[0])
+                    return float(value)
+                except (ValueError, TypeError):
+                    return None
+            
+            wind_center = normalize_window_value(get_window_value(CommonTags.WindowCenter))
+            wind_width = normalize_window_value(get_window_value(CommonTags.WindowWidth))
             
             # Create pixel_header
             pixel_header = PixelDataHeader(
