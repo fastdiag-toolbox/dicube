@@ -220,8 +220,10 @@ class DcbStreamingReader:
         offset = self.frame_offsets[frame_index]
         length = self.frame_lengths[frame_index]
         
-        self.file_handle.seek(offset)
-        return self.file_handle.read(length)
+        # Thread-safe file access
+        with self._cache_lock:
+            self.file_handle.seek(offset)
+            return self.file_handle.read(length)
     
     
     def get_frame_count(self) -> int:
