@@ -77,7 +77,7 @@ class DcbStreamingReader:
         
         # Caching infrastructure
         self._cache_lock = threading.RLock()
-        self._file_lock = threading.Lock() 
+        self._read_lock = threading.Lock()
         self._dicom_cache: OrderedDict[int, bytes] = OrderedDict()  # LRU cache
         self._loading_frames: Set[int] = set()  # Frames currently being loaded
         self._last_access_time = time.time()
@@ -178,8 +178,8 @@ class DcbStreamingReader:
                 return dicom_data
         
         try:
-            # Generate DICOM data
-            dicom_data = self._create_dicom_for_frame(frame_index)
+            with self._read_lock:
+                dicom_data = self._create_dicom_for_frame(frame_index)
             
             # Cache the result
             self._cache_dicom_data(frame_index, dicom_data)
@@ -221,9 +221,8 @@ class DcbStreamingReader:
         offset = self.frame_offsets[frame_index]
         length = self.frame_lengths[frame_index]
         
-        with self._file_lock:
-            self.file_handle.seek(offset)
-            return self.file_handle.read(length)
+        self.file_handle.seek(offset)
+        return self.file_handle.read(length)
     
     
     def get_frame_count(self) -> int:
@@ -260,7 +259,8 @@ class DcbStreamingReader:
                 
                 try:
                     # Create DICOM data
-                    dicom_data = self._create_dicom_for_frame(idx)
+                    with self._read_lock:
+                        dicom_data = self._create_dicom_for_frame(idx)
                     # Cache it
                     self._cache_dicom_data(idx, dicom_data)
                 except Exception:
