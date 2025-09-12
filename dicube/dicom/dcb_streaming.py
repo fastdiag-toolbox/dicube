@@ -260,6 +260,8 @@ class DcbStreamingReader:
                 try:
                     # Create DICOM data
                     with self._read_lock:
+                        if not self.file_handle:
+                            break  # Exit the loop
                         dicom_data = self._create_dicom_for_frame(idx)
                     # Cache it
                     self._cache_dicom_data(idx, dicom_data)
@@ -304,9 +306,10 @@ class DcbStreamingReader:
     
     def close(self):
         """Close file handle."""
-        if self.file_handle:
-            self.file_handle.close()
-            self.file_handle = None
+        with self._read_lock:
+            if self.file_handle:
+                self.file_handle.close()
+                self.file_handle = None
     
     def __enter__(self):
         """Support with statement."""
