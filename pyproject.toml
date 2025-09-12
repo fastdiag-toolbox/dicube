@@ -1,7 +1,8 @@
 [build-system]
 requires = [
     "scikit-build-core>=0.5.0",
-    "pybind11[global]>=2.10.0", 
+    "pybind11[global]>=2.10.0,<2.12.0; python_version<'3.9'",
+    "pybind11[global]>=2.10.0; python_version>='3.9'", 
     "numpy>=1.21.0",
     "setuptools_scm",
 ]
@@ -38,7 +39,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-jph = ["pybind11>=2.10.0"]
+jph = [
+    "pybind11>=2.10.0,<2.12.0; python_version<'3.9'",
+    "pybind11>=2.10.0; python_version>='3.9'"
+]
 nifti = ["nibabel>=3.2.0"]
 dev = [
     "pytest>=7.0.0",
@@ -51,7 +55,11 @@ dev = [
     "pylibjpeg-openjpeg>=2.0",
     "nibabel>=3.2.0", 
 ]
-all = ["pybind11>=2.10.0", "nibabel>=3.2.0"]
+all = [
+    "pybind11>=2.10.0,<2.12.0; python_version<'3.9'",
+    "pybind11>=2.10.0; python_version>='3.9'", 
+    "nibabel>=3.2.0"
+]
 
 [project.urls]
 "Homepage" = "https://github.com/fastdiag-toolbox/dicube"
