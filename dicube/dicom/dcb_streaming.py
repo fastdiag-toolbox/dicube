@@ -77,6 +77,7 @@ class DcbStreamingReader:
         
         # Caching infrastructure
         self._cache_lock = threading.RLock()
+        self._file_lock = threading.Lock() 
         self._dicom_cache: OrderedDict[int, bytes] = OrderedDict()  # LRU cache
         self._loading_frames: Set[int] = set()  # Frames currently being loaded
         self._last_access_time = time.time()
@@ -220,8 +221,7 @@ class DcbStreamingReader:
         offset = self.frame_offsets[frame_index]
         length = self.frame_lengths[frame_index]
         
-        # Thread-safe file access
-        with self._cache_lock:
+        with self._file_lock:
             self.file_handle.seek(offset)
             return self.file_handle.read(length)
     
