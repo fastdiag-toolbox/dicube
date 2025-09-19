@@ -28,7 +28,6 @@ from .dicom import (
     DicomStatus,
     SortMethod,
     get_dicom_status,
-    read_dicom_dir,
 )
 
 from importlib.metadata import version as _pkg_version, PackageNotFoundError
@@ -162,7 +161,6 @@ def save_to_nifti(
 __all__ = [
     "DicomCubeImage",
     "DicomMeta",
-    "read_dicom_dir",
     "DicomStatus",
     "get_dicom_status",
     "CommonTags",

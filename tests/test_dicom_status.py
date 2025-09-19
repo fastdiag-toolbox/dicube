@@ -2,7 +2,8 @@ import copy
 
 import pytest
 
-from dicube import CommonTags, DicomStatus, get_dicom_status, read_dicom_dir
+from dicube import CommonTags, DicomStatus, get_dicom_status
+from dicube.dicom.dicom_meta import _parse_dicom_dir
 from dicube.dicom.dicom_tags import get_tag_key
 
 
@@ -11,7 +12,7 @@ def normal_meta(sample_dicom_dir):
     """
     读取一个"正常"的DICOM文件夹，返回对应的meta。
     """
-    meta, _ = read_dicom_dir(sample_dicom_dir)
+    meta, _ = _parse_dicom_dir(sample_dicom_dir)
     return meta
 
 

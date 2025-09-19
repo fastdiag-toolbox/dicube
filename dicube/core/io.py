@@ -12,9 +12,9 @@ from ..dicom import (
     DicomStatus,
     SortMethod,
     get_dicom_status,
-    read_dicom_dir,
     get_space_from_DicomMeta,
 )
+from ..dicom.dicom_meta import _parse_dicom_dir
 from ..dicom.dicom_builder import DicomBuilder, save_dicom
 from ..storage.dcb_file import DcbSFile, DcbFile, DcbAFile, DcbLFile
 from ..storage.pixel_utils import derive_pixel_header_from_array, determine_optimal_nifti_dtype
@@ -229,7 +229,7 @@ class DicomCubeImageIO:
         
         try:
             # Read DICOM folder
-            meta, datasets = read_dicom_dir(folder_path, sort_method=sort_method)
+            meta, datasets = _parse_dicom_dir(folder_path, sort_method=sort_method)
             
             # Get slopes and intercepts for all slices (handles both shared and non-shared)
             slopes = meta.get_values(CommonTags.RescaleSlope)

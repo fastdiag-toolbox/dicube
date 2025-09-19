@@ -109,19 +109,27 @@ raw_data = image.raw_image       # Returns original dtype
 DICOM metadata container with efficient shared/non-shared value handling:
 
 ```python
-from dicube import DicomMeta, read_dicom_dir
+import dicube
+from dicube import get_dicom_status
+from dicube.dicom import CommonTags
 
-# Read DICOM directory
-meta = read_dicom_dir('dicom_folder/')
+# Load complete image (includes all metadata)
+image = dicube.load_from_dicom_folder('dicom_folder/')
+meta = image.dicom_meta
+
+# Or load only metadata from a DiCube file
+meta = dicube.load_meta('scan.dcbs')
 
 # Access shared values (same across all slices)
-patient_name = meta.get('PatientName')  # Returns single value
+patient_name = meta.get_shared_value(CommonTags.PatientName)  # Returns single value
 
 # Access non-shared values (different per slice)
-positions = meta.get('ImagePositionPatient')  # Returns list
+positions = meta.get_values(CommonTags.ImagePositionPatient)  # Returns list
 
-# Check status
-from dicube import get_dicom_status
+# Check if a field is shared across all slices
+is_uniform_spacing = meta.is_shared(CommonTags.PixelSpacing)
+
+# Check DICOM status
 status = get_dicom_status(meta)
 ```
 

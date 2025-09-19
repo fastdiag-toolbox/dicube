@@ -661,7 +661,7 @@ class DicomMeta:
         return _slice_merged_data(self, index)
 
 
-def read_dicom_dir(
+def _parse_dicom_dir(
     directory: str,
     stop_before_pixels=False,
     sort_method: SortMethod = SortMethod.INSTANCE_NUMBER_ASC,
